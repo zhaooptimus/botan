@@ -16,34 +16,9 @@ language: cpp
 #   $ git difftool master coverity_scan .travis.yml
 os:
   - linux
-  - osx
 
 compiler:
-  - clang
   - gcc
-
-env:
-  matrix:
-    - MODULES="all" BUILD_MODE="shared"
-    - MODULES="all" BUILD_MODE="static"
-    - MODULES="all" BUILD_MODE="coverage"
-    - MODULES="all" BUILD_MODE="sanitizer"
-
-    - MODULES="min" BUILD_MODE="shared"
-    - MODULES="min" BUILD_MODE="static"
-
-matrix:
-  exclude:
-    - os: osx
-      compiler: gcc
-    - compiler: clang
-      env: MODULES="all" BUILD_MODE="coverage"
-    - compiler: clang
-      env: MODULES="all" BUILD_MODE="sanitizer"
-    - compiler: clang
-      env: MODULES="min" BUILD_MODE="shared"
-    - compiler: clang
-      env: MODULES="min" BUILD_MODE="static"
 # END BUILD MATRIX
 
 cache:
