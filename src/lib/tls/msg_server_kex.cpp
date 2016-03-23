@@ -48,7 +48,7 @@ Server_Key_Exchange::Server_Key_Exchange(Handshake_IO& io,
 
    if(kex_algo == "DH" || kex_algo == "DHE_PSK")
       {
-      std::unique_ptr<DH_PrivateKey> dh(new DH_PrivateKey(rng, policy.dh_group()));
+      std::unique_ptr<DH_PrivateKey> dh(new DH_PrivateKey(rng, DL_Group(policy.dh_group())));
 
       append_tls_length_value(m_params, BigInt::encode(dh->get_domain().get_p()), 2);
       append_tls_length_value(m_params, BigInt::encode(dh->get_domain().get_g()), 2);
@@ -233,10 +233,12 @@ std::vector<byte> Server_Key_Exchange::serialize() const
 * Verify a Server Key Exchange message
 */
 bool Server_Key_Exchange::verify(const Public_Key& server_key,
-                                 const Handshake_State& state) const
+                                 const Handshake_State& state,
+                                 const Policy& policy) const
    {
    std::pair<std::string, Signature_Format> format =
-      state.understand_sig_format(server_key, m_hash_algo, m_sig_algo);
+      state.parse_sig_format(server_key, m_hash_algo, m_sig_algo,
+                             false, policy);
 
    PK_Verifier verifier(server_key, format.first, format.second);
 

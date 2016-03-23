@@ -13,6 +13,7 @@
 #include <botan/charset.h>
 #include <botan/internal/bit_ops.h>
 #include <algorithm>
+#include <sstream>
 
 namespace Botan {
 
@@ -32,6 +33,7 @@ Certificate_Extension* Extensions::get_extension(const OID& oid)
    X509_EXTENSION("X509v3.ExtendedKeyUsage", Extended_Key_Usage);
    X509_EXTENSION("X509v3.IssuerAlternativeName", Issuer_Alternative_Name);
    X509_EXTENSION("X509v3.SubjectAlternativeName", Subject_Alternative_Name);
+   X509_EXTENSION("X509v3.NameConstraints", Name_Constraints);
    X509_EXTENSION("X509v3.CertificatePolicies", Certificate_Policies);
    X509_EXTENSION("X509v3.CRLDistributionPoints", CRL_Distribution_Points);
    X509_EXTENSION("PKIX.AuthorityInformationAccess", Authority_Information_Access);
@@ -53,14 +55,12 @@ Extensions::Extensions(const Extensions& extensions) : ASN1_Object()
 * Extensions Assignment Operator
 */
 Extensions& Extensions::operator=(const Extensions& other)
-   {
-   for(size_t i = 0; i != m_extensions.size(); ++i)
-      delete m_extensions[i].first;
+   {   
    m_extensions.clear();
 
    for(size_t i = 0; i != other.m_extensions.size(); ++i)
       m_extensions.push_back(
-         std::make_pair(other.m_extensions[i].first->copy(),
+         std::make_pair(std::unique_ptr<Certificate_Extension>(other.m_extensions[i].first->copy()),
                         other.m_extensions[i].second));
 
    m_throw_on_unknown_critical = other.m_throw_on_unknown_critical;
@@ -78,7 +78,14 @@ OID Certificate_Extension::oid_of() const
 
 void Extensions::add(Certificate_Extension* extn, bool critical)
    {
-   m_extensions.push_back(std::make_pair(extn, critical));
+   m_extensions.push_back(std::make_pair(std::unique_ptr<Certificate_Extension>(extn), critical));
+   m_extensions_raw.emplace(extn->oid_of(), std::make_pair(extn->encode_inner(), critical));
+   }
+
+
+std::map<OID, std::pair<std::vector<byte>, bool>> Extensions::extensions_raw() const
+   {
+   return m_extensions_raw;
    }
 
 /*
@@ -88,7 +95,7 @@ void Extensions::encode_into(DER_Encoder& to_object) const
    {
    for(size_t i = 0; i != m_extensions.size(); ++i)
       {
-      const Certificate_Extension* ext = m_extensions[i].first;
+      const Certificate_Extension* ext = m_extensions[i].first.get();
       const bool is_critical = m_extensions[i].second;
 
       const bool should_encode = ext->should_encode();
@@ -109,9 +116,8 @@ void Extensions::encode_into(DER_Encoder& to_object) const
 */
 void Extensions::decode_from(BER_Decoder& from_source)
    {
-   for(size_t i = 0; i != m_extensions.size(); ++i)
-      delete m_extensions[i].first;
    m_extensions.clear();
+   m_extensions_raw.clear();
 
    BER_Decoder sequence = from_source.start_cons(SEQUENCE);
 
@@ -128,7 +134,9 @@ void Extensions::decode_from(BER_Decoder& from_source)
             .verify_end()
          .end_cons();
 
-      Certificate_Extension* ext = get_extension(oid);
+      m_extensions_raw.emplace(oid, std::make_pair(value, critical));
+
+      std::unique_ptr<Certificate_Extension> ext(get_extension(oid));
 
       if(!ext && critical && m_throw_on_unknown_critical)
          throw Decoding_Error("Encountered unknown X.509 extension marked "
@@ -146,7 +154,7 @@ void Extensions::decode_from(BER_Decoder& from_source)
                                  oid.as_string() + ": " + e.what());
             }
 
-         m_extensions.push_back(std::make_pair(ext, critical));
+         m_extensions.push_back(std::make_pair(std::move(ext), critical));
          }
       }
 
@@ -160,17 +168,12 @@ void Extensions::contents_to(Data_Store& subject_info,
                              Data_Store& issuer_info) const
    {
    for(size_t i = 0; i != m_extensions.size(); ++i)
+      {
       m_extensions[i].first->contents_to(subject_info, issuer_info);
+      subject_info.add(m_extensions[i].first->oid_name() + ".is_critical", (m_extensions[i].second ? 1 : 0));
+      }
    }
 
-/*
-* Delete an Extensions list
-*/
-Extensions::~Extensions()
-   {
-   for(size_t i = 0; i != m_extensions.size(); ++i)
-      delete m_extensions[i].first;
-   }
 
 namespace Cert_Extension {
 
@@ -309,11 +312,8 @@ void Subject_Key_ID::contents_to(Data_Store& subject, Data_Store&) const
 /*
 * Subject_Key_ID Constructor
 */
-Subject_Key_ID::Subject_Key_ID(const std::vector<byte>& pub_key)
-   {
-   SHA_160 hash;
-   m_key_id = unlock(hash.process(pub_key));
-   }
+Subject_Key_ID::Subject_Key_ID(const std::vector<byte>& pub_key) : m_key_id(unlock(SHA_160().process(pub_key)))
+   {}
 
 /*
 * Encode the extension
@@ -384,11 +384,10 @@ void Alternative_Name::contents_to(Data_Store& subject_info,
 * Alternative_Name Constructor
 */
 Alternative_Name::Alternative_Name(const AlternativeName& alt_name,
-                                   const std::string& oid_name_str)
-   {
-   this->m_alt_name = alt_name;
-   this->m_oid_name_str = oid_name_str;
-   }
+                                   const std::string& oid_name_str) :
+   m_oid_name_str(oid_name_str),
+   m_alt_name(alt_name)
+   {}
 
 /*
 * Subject_Alternative_Name Constructor
@@ -436,6 +435,71 @@ void Extended_Key_Usage::contents_to(Data_Store& subject, Data_Store&) const
       subject.add("X509v3.ExtendedKeyUsage", m_oids[i].as_string());
    }
 
+/*
+* Encode the extension
+*/
+std::vector<byte> Name_Constraints::encode_inner() const
+   {
+   throw std::runtime_error("Name_Constraints encoding not implemented");
+   }
+
+
+/*
+* Decode the extension
+*/
+void Name_Constraints::decode_inner(const std::vector<byte>& in)
+   {
+   std::vector<GeneralSubtree> permit, exclude;
+   BER_Decoder ber(in);
+   BER_Decoder ext = ber.start_cons(SEQUENCE);
+   BER_Object per = ext.get_next_object();
+
+   ext.push_back(per);
+   if(per.type_tag == 0 && per.class_tag == ASN1_Tag(CONSTRUCTED | CONTEXT_SPECIFIC))
+      {
+      ext.decode_list(permit,ASN1_Tag(0),ASN1_Tag(CONSTRUCTED | CONTEXT_SPECIFIC));
+      if(permit.empty())
+         throw Encoding_Error("Empty Name Contraint list");
+      }
+
+   BER_Object exc = ext.get_next_object();
+   ext.push_back(exc);
+   if(per.type_tag == 1 && per.class_tag == ASN1_Tag(CONSTRUCTED | CONTEXT_SPECIFIC))
+      {
+      ext.decode_list(exclude,ASN1_Tag(1),ASN1_Tag(CONSTRUCTED | CONTEXT_SPECIFIC));
+      if(exclude.empty())
+         throw Encoding_Error("Empty Name Contraint list");
+      }
+
+   ext.end_cons();
+
+   if(permit.empty() && exclude.empty())
+      throw Encoding_Error("Empty Name Contraint extension");
+
+   m_name_constraints = NameConstraints(std::move(permit),std::move(exclude));
+   }
+
+/*
+* Return a textual representation
+*/
+void Name_Constraints::contents_to(Data_Store& subject, Data_Store&) const
+   {
+   std::stringstream ss;
+
+   for(const GeneralSubtree& gs: m_name_constraints.permitted())
+      {
+      ss << gs;
+      subject.add("X509v3.NameConstraints.permitted", ss.str());
+      ss.str(std::string());
+      }
+   for(const GeneralSubtree& gs: m_name_constraints.excluded())
+      {
+      ss << gs;
+      subject.add("X509v3.NameConstraints.excluded", ss.str());
+      ss.str(std::string());
+      }
+   }
+
 namespace {
 
 /*
@@ -444,26 +508,28 @@ namespace {
 class Policy_Information : public ASN1_Object
    {
    public:
-      // public member variable:
-      OID oid;
-
       Policy_Information() {}
-      Policy_Information(const OID& oid) : oid(oid) {}
+      explicit Policy_Information(const OID& oid) : m_oid(oid) {}
+
+      const OID& oid() const { return m_oid; }
 
       void encode_into(DER_Encoder& codec) const override
          {
          codec.start_cons(SEQUENCE)
-            .encode(oid)
+            .encode(m_oid)
             .end_cons();
          }
 
       void decode_from(BER_Decoder& codec) override
          {
          codec.start_cons(SEQUENCE)
-            .decode(oid)
+            .decode(m_oid)
             .discard_remaining()
             .end_cons();
          }
+
+   private:
+      OID m_oid;
    };
 
 }
@@ -476,7 +542,7 @@ std::vector<byte> Certificate_Policies::encode_inner() const
    std::vector<Policy_Information> policies;
 
    for(size_t i = 0; i != m_oids.size(); ++i)
-      policies.push_back(m_oids[i]);
+      policies.push_back(Policy_Information(m_oids[i]));
 
    return DER_Encoder()
       .start_cons(SEQUENCE)
@@ -496,7 +562,7 @@ void Certificate_Policies::decode_inner(const std::vector<byte>& in)
 
    m_oids.clear();
    for(size_t i = 0; i != policies.size(); ++i)
-      m_oids.push_back(policies[i].oid);
+      m_oids.push_back(policies[i].oid());
    }
 
 /*

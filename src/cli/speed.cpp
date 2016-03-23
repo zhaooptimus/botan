@@ -107,7 +107,21 @@ class Timer
             const uint64_t now = get_clock();
 
             if(now > m_timer_start)
-               m_time_used += (now - m_timer_start);
+               {
+               uint64_t dur = now - m_timer_start;
+
+               m_time_used += dur;
+
+               if(m_event_count == 0)
+                  {
+                  m_min_time = m_max_time = dur;
+                  }
+               else
+                  {
+                  m_max_time = std::max(m_max_time, dur);
+                  m_min_time = std::min(m_min_time, dur);
+                  }
+               }
 
             m_timer_start = 0;
             ++m_event_count;
@@ -122,7 +136,7 @@ class Timer
       struct Timer_Scope
          {
          public:
-            Timer_Scope(Timer& timer) : m_timer(timer) { m_timer.start(); }
+            explicit Timer_Scope(Timer& timer) : m_timer(timer) { m_timer.start(); }
             ~Timer_Scope() { m_timer.stop(); }
          private:
             Timer& m_timer;
@@ -156,12 +170,17 @@ class Timer
       const std::string& get_name() const { return m_name; }
       const std::string& doing() const { return m_doing; }
 
+      uint64_t min_time() const { return m_min_time; }
+      uint64_t max_time() const { return m_max_time; }
+
       static std::string result_string_bps(const Timer& t);
       static std::string result_string_ops(const Timer& t);
    private:
       std::string m_name, m_doing;
       uint64_t m_time_used = 0, m_timer_start = 0;
       uint64_t m_event_count = 0, m_event_mult = 0;
+
+      uint64_t m_max_time = 0, m_min_time = 0;
    };
 
 std::string Timer::result_string_bps(const Timer& timer)
@@ -190,13 +209,21 @@ std::string Timer::result_string_ops(const Timer& timer)
 
    const double events_per_second = timer.events() / timer.seconds();
 
-   oss << timer.get_name() << " "
-       << static_cast<uint64_t>(events_per_second)
-       << ' ' << timer.doing() << "/sec; "
-       << std::setprecision(2) << std::fixed
-       << timer.ms_per_event() << " ms/op"
-       << " (" << timer.events() << " " << (timer.events() == 1 ? "op" : "ops")
-       << " in " << timer.milliseconds() << " ms)\n";
+   oss << timer.get_name() << " ";
+
+   if(timer.events() == 0)
+      {
+      oss << "no events\n";
+      }
+   else
+      {
+      oss << static_cast<uint64_t>(events_per_second)
+          << ' ' << timer.doing() << "/sec; "
+          << std::setprecision(2) << std::fixed
+          << timer.ms_per_event() << " ms/op"
+          << " (" << timer.events() << " " << (timer.events() == 1 ? "op" : "ops")
+          << " in " << timer.milliseconds() << " ms)\n";
+      }
 
    return oss.str();
    }
@@ -359,6 +386,10 @@ class Speed final : public Command
             else if(algo == "random_prime")
                {
                bench_random_prime(msec);
+               }
+            else if(algo == "inverse_mod")
+               {
+               bench_inverse_mod(msec);
                }
 #endif
             else if(algo == "RNG")
@@ -601,6 +632,51 @@ class Speed final : public Command
          }
 
 #if defined(BOTAN_HAS_NUMBERTHEORY)
+
+      void bench_inverse_mod(const std::chrono::milliseconds runtime)
+         {
+         Botan::BigInt p;
+         p.set_bit(521);
+         p--;
+
+         Timer invmod_timer("inverse_mod");
+         Timer monty_timer("montgomery_inverse");
+         Timer ct_invmod_timer("ct_inverse_mod");
+         Timer powm_timer("exponentiation");
+
+         Botan::Fixed_Exponent_Power_Mod powm_p(p - 2, p);
+
+         while(invmod_timer.under(runtime))
+            {
+            const Botan::BigInt x(rng(), p.bits() - 1);
+
+            const Botan::BigInt x_inv1 = invmod_timer.run([&]{
+               return Botan::inverse_mod(x + p, p);
+               });
+
+            const Botan::BigInt x_inv2 = monty_timer.run([&]{
+               return Botan::normalized_montgomery_inverse(x, p);
+               });
+
+            const Botan::BigInt x_inv3 = ct_invmod_timer.run([&]{
+               return Botan::ct_inverse_mod_odd_modulus(x, p);
+               });
+
+            const Botan::BigInt x_inv4 = powm_timer.run([&]{
+               return powm_p(x);
+               });
+
+            BOTAN_ASSERT_EQUAL(x_inv1, x_inv2, "Same result");
+            BOTAN_ASSERT_EQUAL(x_inv1, x_inv3, "Same result");
+            BOTAN_ASSERT_EQUAL(x_inv1, x_inv4, "Same result");
+            }
+
+         output() << Timer::result_string_ops(invmod_timer);
+         output() << Timer::result_string_ops(monty_timer);
+         output() << Timer::result_string_ops(ct_invmod_timer);
+         output() << Timer::result_string_ops(powm_timer);
+         }
+
       void bench_random_prime(const std::chrono::milliseconds runtime)
          {
          const size_t coprime = 65537; // simulates RSA key gen
@@ -650,8 +726,8 @@ class Speed final : public Command
          Botan::PK_Encryptor_EME enc(key, padding, provider);
          Botan::PK_Decryptor_EME dec(key, padding, provider);
 
-         Timer enc_timer(nm, provider, "encrypt");
-         Timer dec_timer(nm, provider, "decrypt");
+         Timer enc_timer(nm, provider, padding + " encrypt");
+         Timer dec_timer(nm, provider, padding + " decrypt");
 
          while(enc_timer.under(msec) || dec_timer.under(msec))
             {
@@ -694,10 +770,10 @@ class Speed final : public Command
 
          while(ka_timer.under(msec))
             {
-            Botan::SymmetricKey key1 = ka_timer.run([&] { return ka1.derive_key(32, ka2_pub); });
-            Botan::SymmetricKey key2 = ka_timer.run([&] { return ka2.derive_key(32, ka1_pub); });
+            Botan::SymmetricKey symkey1 = ka_timer.run([&] { return ka1.derive_key(32, ka2_pub); });
+            Botan::SymmetricKey symkey2 = ka_timer.run([&] { return ka2.derive_key(32, ka1_pub); });
 
-            if(key1 != key2)
+            if(symkey1 != symkey1)
                {
                error_output() << "Key agreement mismatch in PK bench\n";
                }
@@ -717,8 +793,8 @@ class Speed final : public Command
          Botan::PK_Signer   sig(key, padding, Botan::IEEE_1363, provider);
          Botan::PK_Verifier ver(key, padding, Botan::IEEE_1363, provider);
 
-         Timer sig_timer(nm, provider, "sign");
-         Timer ver_timer(nm, provider, "verify");
+         Timer sig_timer(nm, provider, padding + " sign");
+         Timer ver_timer(nm, provider, padding + " verify");
 
          while(ver_timer.under(msec) || sig_timer.under(msec))
             {
@@ -779,7 +855,10 @@ class Speed final : public Command
 
             // Using PKCS #1 padding so OpenSSL provider can play along
             bench_pk_enc(*key, nm, provider, "EME-PKCS1-v1_5", msec);
+            bench_pk_enc(*key, nm, provider, "OAEP(SHA-1)", msec);
+
             bench_pk_sig(*key, nm, provider, "EMSA-PKCS1-v1_5(SHA-1)", msec);
+            bench_pk_sig(*key, nm, provider, "PSSR(SHA-256)", msec);
             }
          }
 #endif
@@ -795,7 +874,7 @@ class Speed final : public Command
             Timer keygen_timer(nm, provider, "keygen");
 
             std::unique_ptr<Botan::Private_Key> key(keygen_timer.run([&] {
-               return new Botan::ECDSA_PrivateKey(rng(), grp);
+               return new Botan::ECDSA_PrivateKey(rng(), Botan::EC_Group(grp));
                }));
 
             output() << Timer::result_string_ops(keygen_timer);
@@ -816,10 +895,10 @@ class Speed final : public Command
             Timer keygen_timer(nm, provider, "keygen");
 
             std::unique_ptr<Botan::PK_Key_Agreement_Key> key1(keygen_timer.run([&] {
-               return new Botan::DH_PrivateKey(rng(), grp);
+               return new Botan::DH_PrivateKey(rng(), Botan::DL_Group(grp));
                }));
             std::unique_ptr<Botan::PK_Key_Agreement_Key> key2(keygen_timer.run([&] {
-               return new Botan::DH_PrivateKey(rng(), grp);
+               return new Botan::DH_PrivateKey(rng(), Botan::DL_Group(grp));
                }));
 
             output() << Timer::result_string_ops(keygen_timer);
@@ -839,10 +918,10 @@ class Speed final : public Command
             Timer keygen_timer(nm, provider, "keygen");
 
             std::unique_ptr<Botan::PK_Key_Agreement_Key> key1(keygen_timer.run([&] {
-               return new Botan::ECDH_PrivateKey(rng(), grp);
+               return new Botan::ECDH_PrivateKey(rng(), Botan::EC_Group(grp));
                }));
             std::unique_ptr<Botan::PK_Key_Agreement_Key> key2(keygen_timer.run([&] {
-               return new Botan::ECDH_PrivateKey(rng(), grp);
+               return new Botan::ECDH_PrivateKey(rng(), Botan::EC_Group(grp));
                }));
 
             output() << Timer::result_string_ops(keygen_timer);

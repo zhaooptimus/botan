@@ -6,6 +6,7 @@
 */
 
 #include <botan/dlies.h>
+#include <botan/internal/ct_utils.h>
 
 namespace Botan {
 
@@ -21,6 +22,8 @@ DLIES_Encryptor::DLIES_Encryptor(const PK_Key_Agreement_Key& key,
    m_mac(mac_obj),
    m_mac_keylen(mac_kl)
    {
+   BOTAN_ASSERT_NONNULL(kdf_obj);
+   BOTAN_ASSERT_NONNULL(mac_obj);
    m_my_key = key.public_value();
    }
 
@@ -95,7 +98,8 @@ DLIES_Decryptor::DLIES_Decryptor(const PK_Key_Agreement_Key& key,
 /*
 * DLIES Decryption
 */
-secure_vector<byte> DLIES_Decryptor::dec(const byte msg[], size_t length) const
+secure_vector<byte> DLIES_Decryptor::do_decrypt(byte& valid_mask,
+                                                const byte msg[], size_t length) const
    {
    if(length < m_my_key.size() + m_mac->output_length())
       throw Decoding_Error("DLIES decryption: ciphertext is too short");
@@ -122,8 +126,8 @@ secure_vector<byte> DLIES_Decryptor::dec(const byte msg[], size_t length) const
    for(size_t j = 0; j != 8; ++j)
       m_mac->update(0);
    secure_vector<byte> T2 = m_mac->final();
-   if(T != T2)
-      throw Decoding_Error("DLIES: message authentication failed");
+
+   valid_mask = CT::expand_mask<byte>(same_mem(T.data(), T2.data(), T.size()));
 
    xor_buf(C, K.data() + m_mac_keylen, C.size());
 

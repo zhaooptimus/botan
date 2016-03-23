@@ -57,10 +57,14 @@ class BOTAN_DLL Policy
       */
       virtual std::vector<std::string> allowed_signature_methods() const;
 
+      bool allowed_signature_method(const std::string& sig_method) const;
+
       /**
       * Return list of ECC curves we are willing to use in order of preference
       */
       virtual std::vector<std::string> allowed_ecc_curves() const;
+
+      bool allowed_ecc_curve(const std::string& curve) const;
 
       /**
       * Returns a list of compression algorithms we are willing to use,
@@ -288,6 +292,9 @@ class BOTAN_DLL Text_Policy : public Policy
       u32bit session_ticket_lifetime() const override
          { return get_len("session_ticket_lifetime", Policy::session_ticket_lifetime()); }
 
+      bool send_fallback_scsv(Protocol_Version version) const override
+         { return get_bool("send_fallback_scsv", false) ? Policy::send_fallback_scsv(version) : false; }
+
       std::vector<u16bit> srtp_profiles() const override
          {
          std::vector<u16bit> r;
@@ -300,16 +307,14 @@ class BOTAN_DLL Text_Policy : public Policy
 
       void set(const std::string& k, const std::string& v) { m_kv[k] = v; }
 
-      Text_Policy(const std::string& s)
+      explicit Text_Policy(const std::string& s)
          {
          std::istringstream iss(s);
          m_kv = read_cfg(iss);
          }
 
-      Text_Policy(std::istream& in)
-         {
-         m_kv = read_cfg(in);
-         }
+      explicit Text_Policy(std::istream& in) : m_kv(read_cfg(in))
+         {}
 
    private:
 

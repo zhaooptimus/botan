@@ -68,7 +68,7 @@ template<typename T>
 inline void unpoison(T& p)
    {
 #if defined(BOTAN_HAS_VALGRIND)
-   VALGRIND_MAKE_MEM_DEFINED(p, sizeof(T));
+   VALGRIND_MAKE_MEM_DEFINED(&p, sizeof(T));
 #else
    BOTAN_UNUSED(p);
 #endif
@@ -100,6 +100,12 @@ inline T select(T mask, T from0, T from1)
    return (from0 & mask) | (from1 & ~mask);
    }
 
+template<typename PredT, typename ValT>
+inline ValT val_or_zero(PredT pred_val, ValT val)
+   {
+   return select(CT::expand_mask<ValT>(pred_val), val, static_cast<ValT>(0));
+   }
+
 template<typename T>
 inline T is_zero(T x)
    {
@@ -127,12 +133,28 @@ inline void conditional_copy_mem(T value,
                                  T* to,
                                  const T* from0,
                                  const T* from1,
-                                 size_t bytes)
+                                 size_t elems)
    {
    const T mask = CT::expand_mask(value);
 
-   for(size_t i = 0; i != bytes; ++i)
+   for(size_t i = 0; i != elems; ++i)
+      {
       to[i] = CT::select(mask, from0[i], from1[i]);
+      }
+   }
+
+template<typename T>
+inline void cond_zero_mem(T cond,
+                          T* array,
+                          size_t elems)
+   {
+   const T mask = CT::expand_mask(cond);
+   const T zero(0);
+
+   for(size_t i = 0; i != elems; ++i)
+      {
+      array[i] = CT::select(mask, zero, array[i]);
+      }
    }
 
 template<typename T>
@@ -155,20 +177,24 @@ inline T min(T a, T b)
    return select(expand_top_bit(b), b, a);
    }
 
-template<typename T, typename Alloc>
-std::vector<T, Alloc> strip_leading_zeros(const std::vector<T, Alloc>& input)
+inline secure_vector<uint8_t> strip_leading_zeros(const uint8_t in[], size_t length)
    {
    size_t leading_zeros = 0;
 
    uint8_t only_zeros = 0xFF;
 
-   for(size_t i = 0; i != input.size(); ++i)
+   for(size_t i = 0; i != length; ++i)
       {
-      only_zeros &= CT::is_zero(input[i]);
+      only_zeros &= CT::is_zero(in[i]);
       leading_zeros += CT::select<uint8_t>(only_zeros, 1, 0);
       }
 
-   return secure_vector<byte>(input.begin() + leading_zeros, input.end());
+   return secure_vector<byte>(in + leading_zeros, in + length);
+   }
+
+inline secure_vector<byte> strip_leading_zeros(const secure_vector<uint8_t>& in)
+   {
+   return strip_leading_zeros(in.data(), in.size());
    }
 
 }
