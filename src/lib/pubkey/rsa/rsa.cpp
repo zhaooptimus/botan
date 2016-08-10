@@ -11,7 +11,6 @@
 #include <botan/keypair.h>
 #include <botan/blinding.h>
 #include <botan/reducer.h>
-#include <future>
 
 namespace Botan {
 
@@ -95,13 +94,16 @@ class RSA_Private_Operation
 
       BigInt private_op(const BigInt& m) const
          {
-         auto future_j1 = std::async(std::launch::async, m_powermod_d1_p, m);
-         BigInt j2 = m_powermod_d2_q(m);
-         BigInt j1 = future_j1.get();
+         BigInt j[2];
+         BOTAN_PARALLEL_FOR(size_t i = 0; i < 2; ++i)
+            {
+            if(i == 0) j[i] = m_powermod_d1_p(m);
+            else       j[i] = m_powermod_d2_q(m);
+            }
 
-         j1 = m_mod_p.reduce(sub_mul(j1, j2, m_c));
+         j[0] = m_mod_p.reduce(sub_mul(j[0], j[1], m_c));
 
-         return mul_add(j1, m_q, j2);
+         return mul_add(j[0], m_q, j[1]);
          }
 
       const BigInt& m_n;

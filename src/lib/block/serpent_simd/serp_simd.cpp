@@ -181,16 +181,16 @@ void Serpent_SIMD::encrypt_n(const byte in[], byte out[], size_t blocks) const
    {
    const u32bit* KS = &(this->get_round_keys()[0]);
 
-   while(blocks >= 4)
+   const size_t blocks4 = blocks / 4;
+   const size_t leftover_blocks = blocks % 4;
+
+   BOTAN_PARALLEL_FOR(size_t i = 0; i < blocks4; ++i)
       {
-      serpent_encrypt_4(in, out, KS);
-      in += 4 * BLOCK_SIZE;
-      out += 4 * BLOCK_SIZE;
-      blocks -= 4;
+      serpent_encrypt_4(in + 4*BLOCK_SIZE*i, out + 4*BLOCK_SIZE*i, KS);
       }
 
-   if(blocks)
-     Serpent::encrypt_n(in, out, blocks);
+   if(leftover_blocks)
+      Serpent::encrypt_n(in + 4*BLOCK_SIZE*blocks4, out + 4*BLOCK_SIZE*blocks4, leftover_blocks);
    }
 
 /*
@@ -200,16 +200,16 @@ void Serpent_SIMD::decrypt_n(const byte in[], byte out[], size_t blocks) const
    {
    const u32bit* KS = &(this->get_round_keys()[0]);
 
-   while(blocks >= 4)
+   const size_t blocks4 = blocks / 4;
+   const size_t leftover_blocks = blocks % 4;
+
+   BOTAN_PARALLEL_FOR(size_t i = 0; i < blocks4; ++i)
       {
-      serpent_decrypt_4(in, out, KS);
-      in += 4 * BLOCK_SIZE;
-      out += 4 * BLOCK_SIZE;
-      blocks -= 4;
+      serpent_decrypt_4(in + 4*BLOCK_SIZE*i, out + 4*BLOCK_SIZE*i, KS);
       }
 
-   if(blocks)
-     Serpent::decrypt_n(in, out, blocks);
+   if(leftover_blocks)
+      Serpent::decrypt_n(in + 4*BLOCK_SIZE*blocks4, out + 4*BLOCK_SIZE*blocks4, leftover_blocks);
    }
 
 }
