@@ -11,8 +11,7 @@
 #include <string>
 #include <set>
 #include <deque>
-#include <thread>
-#include <future>
+#include <mutex>
 
 #include <botan/version.h>
 #include <botan/loadstor.h>
@@ -222,51 +221,16 @@ class Test_Runner : public Botan_CLI::Command
                        std::ostream& out,
                        size_t threads)
          {
+         std::mutex mutex;
          size_t tests_ran = 0, tests_failed = 0;
 
-         if(threads <= 1)
+         BOTAN_PARALLEL_FOR(size_t i = 0; i < tests_to_run.size(); ++i)
             {
-            for(auto&& test_name : tests_to_run)
-               {
-               const auto results = Botan_Tests::Test::run_test(test_name, false);
-               out << report_out(results, tests_failed, tests_ran) << std::flush;
-               }
-            }
-         else
-            {
+            const auto results = Botan_Tests::Test::run_test(tests_to_run[i], false);
+            const std::string report = report_out(results, tests_failed, tests_ran);
 
-            /*
-            We're not doing this in a particularly nice way, and variance in time is
-            high so commonly we'll 'run dry' by blocking on the first future. But
-            plain C++11 <thread> is missing a lot of tools we'd need (like
-            wait_for_any on a set of futures) and there is no point pulling in an
-            additional dependency just for this. In any case it helps somewhat
-            (50-100% speedup) and provides a proof of concept for parallel testing.
-            */
-
-            typedef std::future<std::vector<Botan_Tests::Test::Result>> FutureResults;
-            std::deque<FutureResults> fut_results;
-
-            for(auto&& test_name : tests_to_run)
-               {
-               auto run_it = [test_name] {
-                  return Botan_Tests::Test::run_test(test_name, false);
-               };
-
-               fut_results.push_back(std::async(std::launch::async, run_it));
-
-               while(fut_results.size() > threads)
-                  {
-                  out << report_out(fut_results[0].get(), tests_failed, tests_ran) << std::flush;
-                  fut_results.pop_front();
-                  }
-               }
-
-            while(fut_results.size() > 0)
-               {
-               out << report_out(fut_results[0].get(), tests_failed, tests_ran) << std::flush;
-               fut_results.pop_front();
-               }
+            std::lock_guard<std::mutex> lock(mutex);
+            out << report << std::flush;
             }
 
          out << "Tests complete ran " << tests_ran << " tests ";
