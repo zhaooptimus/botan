@@ -1,3 +1,7 @@
+dist: trusty
+
+sudo: required
+
 language: cpp
 
 # BEGIN BUILD MATRIX
@@ -20,11 +24,13 @@ os:
 compiler:
   - gcc
 
-# END BUILD MATRIX
+git:
+  depth: 5
 
 cache:
+  ccache: true
   directories:
-    - $HOME/.ccache
+    - $HOME/.sonar/cache
 
 install:
   - ./src/scripts/ci/travis/install.sh
@@ -39,19 +45,7 @@ notifications:
   email: botan-commits@lists.randombit.net
 
 addons:
-  apt:
-    sources:
-    - ubuntu-toolchain-r-test
-    packages:
-    - ccache
-    - g++-4.8
-    - libssl-dev
-    - libsqlite3-dev
-    - zlib1g-dev
-    - libbz2-dev
-    - liblzma-dev
-    - python2
-    - python3
+  sonarqube: true
 
   coverity_scan:
     project:

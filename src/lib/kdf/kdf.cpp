@@ -21,6 +21,10 @@
 #include <botan/kdf2.h>
 #endif
 
+#if defined(BOTAN_HAS_KDF1_18033)
+#include <botan/kdf1_iso18033.h>
+#endif
+
 #if defined(BOTAN_HAS_TLS_V10_PRF)
 #include <botan/prf_tls.h>
 #endif
@@ -31,6 +35,14 @@
 
 #if defined(BOTAN_HAS_X942_PRF)
 #include <botan/prf_x942.h>
+#endif
+
+#if defined(BOTAN_HAS_SP800_108)
+#include <botan/sp800_108.h>
+#endif
+
+#if defined(BOTAN_HAS_SP800_56C)
+#include <botan/sp800_56c.h>
 #endif
 
 #define BOTAN_REGISTER_KDF_NOARGS(type, name)                    \
@@ -81,6 +93,10 @@ BOTAN_REGISTER_KDF_1HASH(KDF1, "KDF1");
 BOTAN_REGISTER_KDF_1HASH(KDF2, "KDF2");
 #endif
 
+#if defined(BOTAN_HAS_KDF1_18033)
+BOTAN_REGISTER_KDF_1HASH( KDF1_18033, "KDF1-18033" );
+#endif
+
 #if defined(BOTAN_HAS_TLS_V10_PRF)
 BOTAN_REGISTER_KDF_NOARGS(TLS_PRF, "TLS-PRF");
 #endif
@@ -93,4 +109,13 @@ BOTAN_REGISTER_NAMED_T(KDF, "TLS-12-PRF", TLS_12_PRF, TLS_12_PRF::make);
 BOTAN_REGISTER_KDF_NAMED_1STR(X942_PRF, "X9.42-PRF");
 #endif
 
+#if defined(BOTAN_HAS_SP800_108)
+BOTAN_REGISTER_NAMED_T(KDF, "SP800-108-Counter", SP800_108_Counter, SP800_108_Counter::make);
+BOTAN_REGISTER_NAMED_T(KDF, "SP800-108-Feedback", SP800_108_Feedback, SP800_108_Feedback::make);
+BOTAN_REGISTER_NAMED_T(KDF, "SP800-108-Pipeline", SP800_108_Pipeline, SP800_108_Pipeline::make);
+#endif
+
+#if defined(BOTAN_HAS_SP800_56C)
+BOTAN_REGISTER_NAMED_T(KDF, "SP800-56C", SP800_56C, SP800_56C::make);
+#endif
 }

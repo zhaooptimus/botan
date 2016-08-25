@@ -190,6 +190,23 @@ bool Test::Result::test_eq(const std::string& what, size_t produced, size_t expe
    return test_is_eq(what, produced, expected);
    }
 
+bool Test::Result::test_eq(const std::string& what, OctetString produced, OctetString expected)
+   {
+   std::ostringstream out;
+   out << m_who << " " << what;
+
+   if(produced == expected)
+      {
+      out << " produced expected result " << produced.as_string();
+      return test_success(out.str());
+      }
+   else
+      {
+      out << " produced unexpected result " << produced.as_string() << " expected " << expected.as_string();
+      return test_failure(out.str());
+      }
+   }
+
 bool Test::Result::test_lt(const std::string& what, size_t produced, size_t expected)
    {
    if(produced >= expected)
@@ -215,6 +232,18 @@ bool Test::Result::test_gte(const std::string& what, size_t produced, size_t exp
       }
 
    return test_success();
+   }
+
+bool Test::Result::test_ne(const std::string& what, size_t produced, size_t expected)
+   {
+   if(produced != expected)
+      {
+      return test_success();
+      }
+
+   std::ostringstream err;
+   err << who() << " " << what << " produced " << produced << " prohibited value";
+   return test_failure(err.str());
    }
 
 #if defined(BOTAN_HAS_BIGINT)
@@ -254,28 +283,14 @@ bool Test::Result::test_eq(const std::string& what, bool produced, bool expected
    return test_is_eq(what, produced, expected);
    }
 
-bool Test::Result::test_rc_ok(const std::string& what, int rc)
+bool Test::Result::test_rc(const std::string& func, int expected, int rc)
    {
-   if(rc != 0)
+   if(expected != rc)
       {
       std::ostringstream err;
       err << m_who;
-      err << " " << what;
-      err << " unexpectedly failed with error code " << rc;
-      return test_failure(err.str());
-      }
-
-   return test_success();
-   }
-
-bool Test::Result::test_rc_fail(const std::string& func, const std::string& why, int rc)
-   {
-   if(rc == 0)
-      {
-      std::ostringstream err;
-      err << m_who;
-      err << " call to " << func << " unexpectedly succeeded";
-      err << " expecting failure because " << why;
+      err << " call to " << func << " unexpectedly returned " << rc;
+      err << " but expecting " << expected;
       return test_failure(err.str());
       }
 
@@ -422,17 +437,20 @@ Botan::RandomNumberGenerator* Test::m_test_rng = nullptr;
 std::string Test::m_data_dir;
 size_t Test::m_soak_level = 0;
 bool Test::m_log_success = false;
+std::string Test::m_pkcs11_lib;
 
 //static
 void Test::setup_tests(size_t soak,
                        bool log_success,
                        const std::string& data_dir,
+                       const std::string& pkcs11_lib,
                        Botan::RandomNumberGenerator* rng)
    {
    m_data_dir = data_dir;
    m_soak_level = soak;
    m_log_success = log_success;
    m_test_rng = rng;
+   m_pkcs11_lib = pkcs11_lib;
    }
 
 //static
@@ -457,6 +475,12 @@ const std::string& Test::data_dir()
 bool Test::log_success()
    {
    return m_log_success;
+   }
+
+//static
+std::string Test::pkcs11_lib()
+   {
+   return m_pkcs11_lib;
    }
 
 //static

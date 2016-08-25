@@ -15,6 +15,7 @@ import os
 import shutil
 import string
 import sys
+import subprocess
 
 def parse_command_line(args):
 
@@ -133,7 +134,7 @@ def main(args = None):
                                       'botan')
 
     out_dir = process_template('%{out_dir}')
-    app_exe = process_template('botan%{program_suffix}')
+    app_exe = process_template('botan%{program_suffix}') if str(cfg['os']) != "windows" else 'botan-cli.exe'
 
     for d in [options.destdir, lib_dir, bin_dir, target_doc_dir, target_include_dir]:
         makedirs(d)
@@ -146,13 +147,20 @@ def main(args = None):
         copy_file(os.path.join(build_include_dir, include),
                   os.path.join(target_include_dir, include))
 
+    build_external_include_dir = os.path.join(options.build_dir, 'include', 'external')
+
+    for include in sorted(os.listdir(build_external_include_dir)):
+        copy_file(os.path.join(build_external_include_dir, include),
+                  os.path.join(target_include_dir, include))
+
     static_lib = process_template('%{lib_prefix}%{libname}.%{static_suffix}')
     copy_file(os.path.join(out_dir, static_lib),
               os.path.join(lib_dir, os.path.basename(static_lib)))
 
     if bool(cfg['build_shared_lib']):
         if str(cfg['os']) == "windows":
-            soname_base = process_template('%{soname_base}') # botan.dll
+            libname = process_template('%{libname}')
+            soname_base = libname + '.dll'
             copy_executable(os.path.join(out_dir, soname_base),
                             os.path.join(lib_dir, soname_base))
         else:
@@ -173,6 +181,20 @@ def main(args = None):
                 os.chdir(prev_cwd)
 
     copy_executable(os.path.join(out_dir, app_exe), os.path.join(bin_dir, app_exe))
+
+    # On Darwin, if we are using shared libraries and we install, we should fix
+    # up the library name, otherwise the botan command won't work; ironically
+    # we only need to do this because we previously changed it from a setting
+    # that would be correct for installation to one that lets us run it from
+    # the build directory
+    if str(cfg['os']) == 'darwin' and bool(cfg['build_shared_lib']):
+        soname_abi = process_template('%{soname_abi}')
+
+        subprocess.check_call(['install_name_tool',
+                               '-change',
+                               os.path.join('@executable_path', soname_abi),
+                               os.path.join(lib_dir, soname_abi),
+                               os.path.join(bin_dir, app_exe)])
 
     if 'botan_pkgconfig' in cfg:
         pkgconfig_dir = os.path.join(options.destdir, options.libdir, options.pkgconfigdir)

@@ -1,6 +1,7 @@
 /*
 * X.509 Certificates
 * (C) 1999-2010,2015 Jack Lloyd
+* (C) 2016 René Korthaus, Rohde & Schwarz Cybersecurity
 *
 * Botan is released under the Simplified BSD License (see license.txt)
 */
@@ -42,9 +43,10 @@ std::vector<std::string> lookup_oids(const std::vector<std::string>& in)
 * X509_Certificate Constructor
 */
 X509_Certificate::X509_Certificate(DataSource& in) :
-   X509_Object(in, "CERTIFICATE/X509 CERTIFICATE")
+   X509_Object(in, "CERTIFICATE/X509 CERTIFICATE"),
+   m_self_signed(false),
+   m_v3_extensions(false)
    {
-   m_self_signed = false;
    do_decode();
    }
 
@@ -52,9 +54,10 @@ X509_Certificate::X509_Certificate(DataSource& in) :
 * X509_Certificate Constructor
 */
 X509_Certificate::X509_Certificate(const std::string& in) :
-   X509_Object(in, "CERTIFICATE/X509 CERTIFICATE")
+   X509_Object(in, "CERTIFICATE/X509 CERTIFICATE"),
+   m_self_signed(false),
+   m_v3_extensions(false)
    {
-   m_self_signed = false;
    do_decode();
    }
 
@@ -62,11 +65,38 @@ X509_Certificate::X509_Certificate(const std::string& in) :
 * X509_Certificate Constructor
 */
 X509_Certificate::X509_Certificate(const std::vector<byte>& in) :
-   X509_Object(in, "CERTIFICATE/X509 CERTIFICATE")
+   X509_Object(in, "CERTIFICATE/X509 CERTIFICATE"),
+   m_self_signed(false),
+   m_v3_extensions(false)
    {
-   m_self_signed = false;
    do_decode();
    }
+
+X509_Certificate::X509_Certificate(const X509_Certificate& other) :
+   X509_Object(other)
+   {
+   m_subject = other.m_subject;
+   m_issuer = other.m_issuer;
+   m_self_signed = other.m_self_signed;
+   m_v3_extensions = other.m_v3_extensions;
+   }
+
+X509_Certificate& X509_Certificate::operator=(const X509_Certificate& other)
+   {
+   if(&other == this)
+      {
+      return *this;
+      }
+   else
+      {
+      m_subject = other.m_subject;
+      m_issuer = other.m_issuer;
+      m_self_signed = other.m_self_signed;
+      m_v3_extensions = other.m_v3_extensions;
+      }
+   return *this;
+   }
+
 
 /*
 * Decode the TBSCertificate data
@@ -120,12 +150,8 @@ void X509_Certificate::force_decode()
    if(v3_exts_data.type_tag == 3 &&
       v3_exts_data.class_tag == ASN1_Tag(CONSTRUCTED | CONTEXT_SPECIFIC))
       {
-      Extensions extensions;
-
-      BER_Decoder(v3_exts_data.value).decode(extensions).verify_end();
-
-      m_v3_extensions = extensions.extensions_raw();
-      extensions.contents_to(m_subject, m_issuer);
+      BER_Decoder(v3_exts_data.value).decode(m_v3_extensions).verify_end();
+      m_v3_extensions.contents_to(m_subject, m_issuer);
       }
    else if(v3_exts_data.type_tag != NO_OBJECT)
       throw BER_Bad_Tag("Unknown tag in X.509 cert",
@@ -134,7 +160,7 @@ void X509_Certificate::force_decode()
    if(tbs_cert.more_items())
       throw Decoding_Error("TBSCertificate has more items that expected");
 
-   m_subject.add("X509.Certificate.version", version);
+   m_subject.add("X509.Certificate.version", static_cast<u32bit>(version));
    m_subject.add("X509.Certificate.serial", BigInt::encode(serial_bn));
    m_subject.add("X509.Certificate.start", start.to_string());
    m_subject.add("X509.Certificate.end", end.to_string());
@@ -157,7 +183,7 @@ void X509_Certificate::force_decode()
       const size_t limit = (x509_version() < 3) ?
         Cert_Extension::NO_CERT_PATH_LIMIT : 0;
 
-      m_subject.add("X509v3.BasicConstraints.path_constraint", limit);
+      m_subject.add("X509v3.BasicConstraints.path_constraint", static_cast<u32bit>(limit));
       }
    }
 
@@ -232,10 +258,10 @@ bool X509_Certificate::allowed_usage(Key_Constraints usage) const
    {
    if(constraints() == NO_CONSTRAINTS)
       return true;
-   return ((constraints() & usage) != 0);
+   return ((constraints() & usage) == usage);
    }
 
-bool X509_Certificate::allowed_usage(const std::string& usage) const
+bool X509_Certificate::allowed_extended_usage(const std::string& usage) const
    {
    const std::vector<std::string> ex = ex_constraints();
 
@@ -256,16 +282,43 @@ bool X509_Certificate::allowed_usage(Usage_Type usage) const
          return true;
 
       case Usage_Type::TLS_SERVER_AUTH:
-         return allowed_usage(Key_Constraints(DATA_ENCIPHERMENT | KEY_ENCIPHERMENT | DIGITAL_SIGNATURE)) && allowed_usage("PKIX.ServerAuth");
+         return allowed_usage(Key_Constraints(DATA_ENCIPHERMENT | KEY_ENCIPHERMENT | DIGITAL_SIGNATURE)) && allowed_extended_usage("PKIX.ServerAuth");
 
       case Usage_Type::TLS_CLIENT_AUTH:
-         return allowed_usage(Key_Constraints(DIGITAL_SIGNATURE | NON_REPUDIATION)) && allowed_usage("PKIX.ClientAuth");
+         return allowed_usage(Key_Constraints(DIGITAL_SIGNATURE | NON_REPUDIATION)) && allowed_extended_usage("PKIX.ClientAuth");
 
       case Usage_Type::OCSP_RESPONDER:
-         return allowed_usage(Key_Constraints(DIGITAL_SIGNATURE | NON_REPUDIATION)) && allowed_usage("PKIX.OCSPSigning");
+         return allowed_usage(Key_Constraints(DIGITAL_SIGNATURE | NON_REPUDIATION)) && allowed_extended_usage("PKIX.OCSPSigning");
 
       case Usage_Type::CERTIFICATE_AUTHORITY:
          return is_CA_cert();
+      }
+
+   return false;
+   }
+
+bool X509_Certificate::has_constraints(Key_Constraints constraints) const
+   {
+   if(this->constraints() == NO_CONSTRAINTS)
+      {
+      return false;
+      }
+
+   return ((this->constraints() & constraints) != 0);
+   }
+
+bool X509_Certificate::has_ex_constraint(const std::string& ex_constraint) const
+   {
+   const std::vector<std::string> ex = ex_constraints();
+
+   if(ex.empty())
+      {
+      return false;
+      }
+
+   if(std::find(ex.begin(), ex.end(), ex_constraint) != ex.end())
+      {
+      return true;
       }
 
    return false;
@@ -332,7 +385,7 @@ std::vector<std::string> X509_Certificate::policies() const
    return lookup_oids(m_subject.get("X509v3.CertificatePolicies"));
    }
 
-std::map<OID, std::pair<std::vector<byte>, bool>> X509_Certificate::v3_extensions() const
+Extensions X509_Certificate::v3_extensions() const
    {
    return m_v3_extensions;
    }
@@ -513,7 +566,7 @@ std::string X509_Certificate::to_string() const
       if(constraints & DIGITAL_SIGNATURE)
          out << "   Digital Signature\n";
       if(constraints & NON_REPUDIATION)
-         out << "   Non-Repuidation\n";
+         out << "   Non-Repudiation\n";
       if(constraints & KEY_ENCIPHERMENT)
          out << "   Key Encipherment\n";
       if(constraints & DATA_ENCIPHERMENT)
@@ -524,6 +577,10 @@ std::string X509_Certificate::to_string() const
          out << "   Cert Sign\n";
       if(constraints & CRL_SIGN)
          out << "   CRL Sign\n";
+      if(constraints & ENCIPHER_ONLY)
+         out << "   Encipher Only\n";
+      if(constraints & DECIPHER_ONLY)
+         out << "   Decipher Only\n";
       }
 
    std::vector<std::string> policies = this->policies();

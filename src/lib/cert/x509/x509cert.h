@@ -11,11 +11,13 @@
 #include <botan/x509_obj.h>
 #include <botan/x509_dn.h>
 #include <botan/x509_key.h>
+#include <botan/x509_ext.h>
 #include <botan/asn1_alt_name.h>
 #include <botan/datastor.h>
 #include <botan/key_constraint.h>
 #include <botan/name_constraint.h>
 #include <map>
+#include <memory>
 
 namespace Botan {
 
@@ -31,7 +33,7 @@ enum class Usage_Type
 /**
 * This class represents X.509 Certificate
 */
-class BOTAN_DLL X509_Certificate final : public X509_Object
+class BOTAN_DLL X509_Certificate : public X509_Object
    {
    public:
       /**
@@ -138,16 +140,38 @@ class BOTAN_DLL X509_Certificate final : public X509_Object
       */
       bool is_CA_cert() const;
 
+      /**
+      * Returns true if the specified @param usage is set in the key usage extension 
+      * or if no key usage constraints are set at all.
+      * To check if a certain key constraint is set in the certificate 
+      * use @see X509_Certificate#has_constraints.
+      */
       bool allowed_usage(Key_Constraints usage) const;
 
       /**
-      * Returns true if and only if name (referring to an extended key
+      * Returns true if the specified @param usage is set in the extended key usage extension
+      * or if no extended key usage constraints are set at all.
+      * To check if a certain extended key constraint is set in the certificate
+      * use @see X509_Certificate#has_ex_constraint.
+      */
+      bool allowed_extended_usage(const std::string& usage) const;
+
+      /**
+      * Returns true if the required key and extended key constraints are set in the certificate
+      * for the specified @param usage or if no key constraints are set in both the key usage
+      * and extended key usage extension.
+      */
+      bool allowed_usage(Usage_Type usage) const;
+
+      /// Returns true if the specified @param constraints are included in the key usage extension.
+      bool has_constraints(Key_Constraints constraints) const;
+      
+      /**
+      * Returns true if and only if @param ex_constraint (referring to an extended key
       * constraint, eg "PKIX.ServerAuth") is included in the extended
       * key extension.
       */
-      bool allowed_usage(const std::string& usage) const;
-
-      bool allowed_usage(Usage_Type usage) const;
+      bool has_ex_constraint(const std::string& ex_constraint) const;
 
       /**
       * Get the path limit as defined in the BasicConstraints extension of
@@ -191,10 +215,10 @@ class BOTAN_DLL X509_Certificate final : public X509_Object
       std::vector<std::string> policies() const;
 
       /**
-      * Get all extensions of this certificate indexed by oid.
-      * @return extension values and critical flag
+      * Get all extensions of this certificate.
+      * @return certificate extensions
       */
-      std::map<OID, std::pair<std::vector<byte>, bool>> v3_extensions() const;
+      Extensions v3_extensions() const;
 
       /**
       * Return the listed address of an OCSP responder, or empty if not set
@@ -250,6 +274,10 @@ class BOTAN_DLL X509_Certificate final : public X509_Object
 
       explicit X509_Certificate(const std::vector<byte>& in);
 
+      X509_Certificate(const X509_Certificate& other);
+
+      X509_Certificate& operator=(const X509_Certificate& other);
+
    private:
       void force_decode() override;
       friend class X509_CA;
@@ -259,7 +287,7 @@ class BOTAN_DLL X509_Certificate final : public X509_Object
 
       Data_Store m_subject, m_issuer;
       bool m_self_signed;
-      std::map<OID, std::pair<std::vector<byte>, bool>> m_v3_extensions;
+      Extensions m_v3_extensions;
    };
 
 /**

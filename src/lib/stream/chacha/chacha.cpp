@@ -10,8 +10,18 @@
 
 namespace Botan {
 
-void ChaCha::chacha(byte output[64], const u32bit input[16])
+ChaCha::ChaCha(size_t rounds) : m_rounds(rounds)
    {
+   if(m_rounds != 8 && m_rounds != 12 && m_rounds != 20)
+      throw Invalid_Argument("ChaCha only supports 8, 12 or 20 rounds");
+   }
+
+namespace {
+
+void chacha(byte output[64], const u32bit input[16], size_t rounds)
+   {
+   BOTAN_ASSERT(rounds % 2 == 0, "Valid rounds");
+
    u32bit x00 = input[ 0], x01 = input[ 1], x02 = input[ 2], x03 = input[ 3],
           x04 = input[ 4], x05 = input[ 5], x06 = input[ 6], x07 = input[ 7],
           x08 = input[ 8], x09 = input[ 9], x10 = input[10], x11 = input[11],
@@ -25,7 +35,7 @@ void ChaCha::chacha(byte output[64], const u32bit input[16])
    c += d; b ^= c; b = rotate_left(b, 7);  \
    } while(0)
 
-   for(size_t i = 0; i != 10; ++i)
+   for(size_t i = 0; i != rounds / 2; ++i)
       {
       CHACHA_QUARTER_ROUND(x00, x04, x08, x12);
       CHACHA_QUARTER_ROUND(x01, x05, x09, x13);
@@ -57,6 +67,7 @@ void ChaCha::chacha(byte output[64], const u32bit input[16])
    store_le(x14 + input[14], output + 4 * 14);
    store_le(x15 + input[15], output + 4 * 15);
    }
+}
 
 /*
 * Combine cipher stream with message
@@ -69,7 +80,7 @@ void ChaCha::cipher(const byte in[], byte out[], size_t length)
       length -= (m_buffer.size() - m_position);
       in += (m_buffer.size() - m_position);
       out += (m_buffer.size() - m_position);
-      chacha(m_buffer.data(), m_state.data());
+      chacha(m_buffer.data(), m_state.data(), m_rounds);
 
       ++m_state[12];
       m_state[13] += (m_state[12] == 0);
@@ -142,7 +153,7 @@ void ChaCha::set_iv(const byte iv[], size_t length)
       m_state[15] = load_le<u32bit>(iv, 2);
       }
 
-   chacha(m_buffer.data(), m_state.data());
+   chacha(m_buffer.data(), m_state.data(), m_rounds);
    ++m_state[12];
    m_state[13] += (m_state[12] == 0);
 
@@ -156,4 +167,32 @@ void ChaCha::clear()
    m_position = 0;
    }
 
+std::string ChaCha::name() const
+   {
+   return "ChaCha(" + std::to_string(m_rounds) + ")";
+   }
+
+void ChaCha::seek(u64bit offset)
+   {
+   if (m_state.size() == 0 && m_buffer.size() == 0)
+      {
+         throw Invalid_State("You have to setup the stream cipher (key and iv)");
+      }
+
+   m_position = offset % m_buffer.size();
+
+   u64bit counter = offset / m_buffer.size();
+
+   byte out[8];
+
+   store_le(counter, out);
+
+   m_state[12] = load_le<u32bit>(out, 0);
+   m_state[13] += load_le<u32bit>(out, 1);
+
+   chacha(m_buffer.data(), m_state.data(), m_rounds);
+
+   ++m_state[12];
+   m_state[13] += (m_state[12] == 0);
+   }
 }
