@@ -12,3 +12,7 @@ if [ "$BUILD_MODE" = "coverage" ]; then
 
     codecov
 fi
+
+if [ "$COVERITY_SCAN_BRANCH" = "1" ]; then
+    cat /home/travis/build/randombit/botan/cov-int/build-log.txt
+fi
