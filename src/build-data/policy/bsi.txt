@@ -41,7 +41,7 @@ eckcdsa
 ecdh
 
 # rng
-hmac_rng
+auto_rng
 hmac_drbg
 </required>
 
