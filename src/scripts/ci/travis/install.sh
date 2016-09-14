@@ -19,9 +19,15 @@ if [ "$BUILD_MODE" = "sonarqube" ]; then
 fi
 
 if [ "$TRAVIS_OS_NAME" = "linux" ]; then
-    if [ "$BUILD_MODE" = "valgrind" ] || [ "${BUILD_MODE:0:5}" = "cross" ]; then
-        sudo apt-get -qq update
+    sudo apt-get -qq update
 
+    if [ "$BUILD_MODE" = "shared" ] || [ "$BUILD_MODE" = "coverage" ]; then
+        sudo apt-get install trousers softhsm
+
+        softhsm --init-token --pin 123456 --so-pin 12345678 --label test
+    fi
+
+    if [ "$BUILD_MODE" = "valgrind" ] || [ "${BUILD_MODE:0:5}" = "cross" ]; then
         if [ "$BUILD_MODE" = "valgrind" ]; then
             sudo apt-get install valgrind
         elif [ "$BUILD_MODE" = "cross-arm32" ]; then
