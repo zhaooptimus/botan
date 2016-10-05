@@ -165,14 +165,18 @@ class BOTAN_DLL Path_Validation_Result
 
 typedef std::function<std::future<OCSP::Response>
                       (const X509_Certificate&,
-                       const X509_Certificate&,
-                       const Certificate_Store&)>
+                       const X509_Certificate&)>
    OCSP_request_fn;
 
+/**
+* Make an OCSP request via a new network connection
+* opened in a std::async thread.
+*
+* The response signature is not verified before returning.
+*/
 BOTAN_DLL std::future<OCSP::Response>
-online_ocsp_check(const X509_Certificate& subject,
-                  const X509_Certificate& issuer,
-                  const Certificate_Store& trusted_roots);
+make_ocsp_request(const X509_Certificate& issuer,
+                  const X509_Certificate& subject);
 
 /**
 * PKIX Path Validation
@@ -190,7 +194,7 @@ Path_Validation_Result BOTAN_DLL x509_path_validate(
    const std::vector<Certificate_Store*>& certstores,
    const std::string& hostname = "",
    Usage_Type usage = Usage_Type::UNSPECIFIED,
-   OCSP_request_fn ocsp_check = online_ocsp_check);
+   OCSP_request_fn ocsp_check = make_ocsp_request);
 
 /**
 * PKIX Path Validation
@@ -207,7 +211,7 @@ inline Path_Validation_Result x509_path_validate(
    const std::vector<Certificate_Store*>& certstores,
    const std::string& hostname = "",
    Usage_Type usage = Usage_Type::UNSPECIFIED,
-   OCSP_request_fn ocsp = online_ocsp_check)
+   OCSP_request_fn ocsp = make_ocsp_request)
    {
    std::vector<X509_Certificate> end_certs;
    end_certs.push_back(end_cert);
@@ -229,7 +233,7 @@ inline Path_Validation_Result x509_path_validate(
    const Certificate_Store& store,
    const std::string& hostname = "",
    Usage_Type usage = Usage_Type::UNSPECIFIED,
-   OCSP_request_fn ocsp = online_ocsp_check)
+   OCSP_request_fn ocsp = make_ocsp_request)
    {
    std::vector<X509_Certificate> end_certs;
    end_certs.push_back(end_cert);
@@ -254,7 +258,7 @@ inline Path_Validation_Result x509_path_validate(
    const Certificate_Store& store,
    const std::string& hostname = "",
    Usage_Type usage = Usage_Type::UNSPECIFIED,
-   OCSP_request_fn ocsp = online_ocsp_check)
+   OCSP_request_fn ocsp = make_ocsp_request)
    {
    std::vector<Certificate_Store*> certstores;
    certstores.push_back(const_cast<Certificate_Store*>(&store));
