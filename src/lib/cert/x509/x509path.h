@@ -11,6 +11,9 @@
 #include <botan/cert_status.h>
 #include <botan/x509cert.h>
 #include <botan/certstor.h>
+#include <botan/ocsp.h>
+#include <future>
+#include <functional>
 #include <set>
 
 namespace Botan {
@@ -160,22 +163,34 @@ class BOTAN_DLL Path_Validation_Result
       std::vector<std::shared_ptr<const X509_Certificate>> m_cert_path;
    };
 
+typedef std::function<std::future<OCSP::Response>
+                      (const X509_Certificate&,
+                       const X509_Certificate&,
+                       const Certificate_Store&)>
+   OCSP_request_fn;
+
+BOTAN_DLL std::future<OCSP::Response>
+online_ocsp_check(const X509_Certificate& subject,
+                  const X509_Certificate& issuer,
+                  const Certificate_Store& trusted_roots);
 
 /**
 * PKIX Path Validation
-* @param end_certs certificate chain to validate
-* @param restrictions path validation restrictions
-* @param certstores list of certificate stores that contain trusted certificates
-* @param hostname if not empty, compared against the DNS name in end_certs[0]
-* @param usage if not set to UNSPECIFIED, compared against the key usage in end_certs[0]
-* @return result of the path validation
+* @param end_certs a chain of certs starting with the end entity
+* @param restrictions any restrictions on the validation process
+* @param certstores trusted certificates
+* @param hostname the expected hostname of the end entity
+* @param usage what this certificate is to be used for
+* @param ocsp_check is a callback requesting an OCSP check be issued,
+*        default online_ocsp_check opens socket in a new thread.
 */
 Path_Validation_Result BOTAN_DLL x509_path_validate(
    const std::vector<X509_Certificate>& end_certs,
    const Path_Validation_Restrictions& restrictions,
    const std::vector<Certificate_Store*>& certstores,
    const std::string& hostname = "",
-   Usage_Type usage = Usage_Type::UNSPECIFIED);
+   Usage_Type usage = Usage_Type::UNSPECIFIED,
+   OCSP_request_fn ocsp_check = online_ocsp_check);
 
 /**
 * PKIX Path Validation
@@ -186,12 +201,18 @@ Path_Validation_Result BOTAN_DLL x509_path_validate(
 * @param usage if not set to UNSPECIFIED, compared against the key usage in end_cert
 * @return result of the path validation
 */
-Path_Validation_Result BOTAN_DLL x509_path_validate(
+inline Path_Validation_Result x509_path_validate(
    const X509_Certificate& end_cert,
    const Path_Validation_Restrictions& restrictions,
    const std::vector<Certificate_Store*>& certstores,
    const std::string& hostname = "",
-   Usage_Type usage = Usage_Type::UNSPECIFIED);
+   Usage_Type usage = Usage_Type::UNSPECIFIED,
+   OCSP_request_fn ocsp = online_ocsp_check)
+   {
+   std::vector<X509_Certificate> end_certs;
+   end_certs.push_back(end_cert);
+   return x509_path_validate(end_certs, restrictions, certstores, hostname, usage, ocsp);
+   }
 
 /**
 * PKIX Path Validation
@@ -202,12 +223,21 @@ Path_Validation_Result BOTAN_DLL x509_path_validate(
 * @param usage if not set to UNSPECIFIED, compared against the key usage in end_cert
 * @return result of the path validation
 */
-Path_Validation_Result BOTAN_DLL x509_path_validate(
+inline Path_Validation_Result x509_path_validate(
    const X509_Certificate& end_cert,
    const Path_Validation_Restrictions& restrictions,
    const Certificate_Store& store,
    const std::string& hostname = "",
-   Usage_Type usage = Usage_Type::UNSPECIFIED);
+   Usage_Type usage = Usage_Type::UNSPECIFIED,
+   OCSP_request_fn ocsp = online_ocsp_check)
+   {
+   std::vector<X509_Certificate> end_certs;
+   end_certs.push_back(end_cert);
+
+   std::vector<Certificate_Store*> certstores;
+   certstores.push_back(const_cast<Certificate_Store*>(&store));
+   return x509_path_validate(end_certs, restrictions, certstores, hostname, usage, ocsp);
+   }
 
 /**
 * PKIX Path Validation
@@ -218,12 +248,19 @@ Path_Validation_Result BOTAN_DLL x509_path_validate(
 * @param usage if not set to UNSPECIFIED, compared against the key usage in end_certs[0]
 * @return result of the path validation
 */
-Path_Validation_Result BOTAN_DLL x509_path_validate(
+inline Path_Validation_Result x509_path_validate(
    const std::vector<X509_Certificate>& end_certs,
    const Path_Validation_Restrictions& restrictions,
    const Certificate_Store& store,
    const std::string& hostname = "",
-   Usage_Type usage = Usage_Type::UNSPECIFIED);
+   Usage_Type usage = Usage_Type::UNSPECIFIED,
+   OCSP_request_fn ocsp = online_ocsp_check)
+   {
+   std::vector<Certificate_Store*> certstores;
+   certstores.push_back(const_cast<Certificate_Store*>(&store));
+
+   return x509_path_validate(end_certs, restrictions, certstores, hostname, usage, ocsp);
+   }
 
 }
 
