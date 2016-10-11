@@ -5,7 +5,7 @@ which shellcheck > /dev/null && shellcheck "$0" # Run shellcheck on this if avai
 MAKE_PREFIX=""
 TEST_PREFIX=""
 TEST_EXE=./botan-test
-CFG_FLAGS=(--prefix=/tmp/botan-installation --cc=$CC --os=$TRAVIS_OS_NAME)
+CFG_FLAGS=(--prefix=/tmp/botan-installation --cc=$CC --os=$TRAVIS_OS_NAME --maintainer-mode)
 
 # PKCS11 is optional but doesn't pull in new dependencies
 CFG_FLAGS+=(--with-pkcs11)

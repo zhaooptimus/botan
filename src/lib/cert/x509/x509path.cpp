@@ -34,8 +34,8 @@ find_issuing_cert(const X509_Certificate& cert,
 
    for(size_t i = 0; i != certstores.size(); ++i)
       {
-      if(std::shared_ptr<const X509_Certificate> c = certstores[i]->find_cert(issuer_dn, auth_key_id))
-         return c;
+      if(std::shared_ptr<const X509_Certificate> c2 = certstores[i]->find_cert(issuer_dn, auth_key_id))
+         return c2;
       }
 
    return nullptr;
