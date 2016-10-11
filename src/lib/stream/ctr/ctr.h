@@ -38,8 +38,6 @@ class BOTAN_DLL CTR_BE final : public StreamCipher
 
       void clear() override;
 
-      static CTR_BE* make(const Spec& spec);
-
       /**
       * @param cipher the underlying block cipher to use
       */

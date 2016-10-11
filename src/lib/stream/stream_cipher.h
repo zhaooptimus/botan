@@ -19,7 +19,7 @@ namespace Botan {
 class BOTAN_DLL StreamCipher : public SymmetricAlgorithm
    {
    public:
-      typedef SCAN_Name Spec;
+      virtual ~StreamCipher() {}
 
       /**
       * Create an instance based on a name
@@ -91,9 +91,6 @@ class BOTAN_DLL StreamCipher : public SymmetricAlgorithm
       * might also return "sse2", "avx2", "openssl", or some other arbitrary string.
       */
       virtual std::string provider() const { return "base"; }
-
-      StreamCipher();
-      virtual ~StreamCipher();
    };
 
 }

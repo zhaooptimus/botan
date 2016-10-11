@@ -21,7 +21,7 @@ namespace Botan {
 class BOTAN_DLL KDF
    {
    public:
-      virtual ~KDF();
+      virtual ~KDF() {}
 
       /**
       * Create an instance based on a name
@@ -149,9 +149,6 @@ class BOTAN_DLL KDF
          }
 
       virtual KDF* clone() const = 0;
-
-      typedef SCAN_Name Spec;
-
    };
 
 /**

@@ -20,8 +20,6 @@ namespace Botan {
 class BOTAN_DLL EME
    {
    public:
-      typedef SCAN_Name Spec;
-
       virtual ~EME() = default;
 
       /**

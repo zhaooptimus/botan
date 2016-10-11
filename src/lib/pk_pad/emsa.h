@@ -22,8 +22,6 @@ namespace Botan {
 class BOTAN_DLL EMSA
    {
    public:
-      typedef SCAN_Name Spec;
-
       /**
       * Add more data to the signature computation
       * @param input some data

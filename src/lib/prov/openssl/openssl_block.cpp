@@ -149,34 +149,17 @@ void OpenSSL_BlockCipher::clear()
    EVP_CIPHER_CTX_set_padding(&m_decrypt, 0);
    }
 
-std::function<BlockCipher* (const BlockCipher::Spec&)>
-make_evp_block_maker(const EVP_CIPHER* cipher, const char* algo)
+}
+
+std::unique_ptr<BlockCipher>
+make_openssl_block_cipher(const std::string& name)
    {
-   return [cipher,algo](const BlockCipher::Spec&)
-      {
-      return new OpenSSL_BlockCipher(cipher, algo);
-      };
+   throw Lookup_Error("OpenSSL does not support cipher " + name);
    }
 
-std::function<BlockCipher* (const BlockCipher::Spec&)>
-make_evp_block_maker_keylen(const EVP_CIPHER* cipher, const char* algo,
-                            size_t kmin, size_t kmax, size_t kmod)
-   {
-   return [cipher,algo,kmin,kmax,kmod](const BlockCipher::Spec&)
-      {
-      return new OpenSSL_BlockCipher(cipher, algo, kmin, kmax, kmod);
-      };
-   }
+}
 
-#define BOTAN_REGISTER_OPENSSL_EVP_BLOCK(NAME, EVP)                            \
-   BOTAN_REGISTER_TYPE(BlockCipher, EVP_BlockCipher ## EVP, NAME,              \
-                       make_evp_block_maker(EVP(), NAME), "openssl", BOTAN_OPENSSL_BLOCK_PRIO)
-
-#define BOTAN_REGISTER_OPENSSL_EVP_BLOCK_KEYLEN(NAME, EVP, KMIN, KMAX, KMOD)       \
-   BOTAN_REGISTER_TYPE(BlockCipher, OpenSSL_BlockCipher ## EVP, NAME,              \
-                       make_evp_block_maker_keylen(EVP(), NAME, KMIN, KMAX, KMOD), \
-                       "openssl", BOTAN_OPENSSL_BLOCK_PRIO)
-
+/*
 #if !defined(OPENSSL_NO_AES)
    BOTAN_REGISTER_OPENSSL_EVP_BLOCK("AES-128", EVP_aes_128_ecb);
    BOTAN_REGISTER_OPENSSL_EVP_BLOCK("AES-192", EVP_aes_192_ecb);
@@ -209,7 +192,5 @@ make_evp_block_maker_keylen(const EVP_CIPHER* cipher, const char* algo,
 #if !defined(OPENSSL_NO_SEED)
    BOTAN_REGISTER_OPENSSL_EVP_BLOCK("SEED", EVP_seed_ecb);
 #endif
+*/
 
-}
-
-}

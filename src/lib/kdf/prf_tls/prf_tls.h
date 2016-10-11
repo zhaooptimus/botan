@@ -50,8 +50,6 @@ class BOTAN_DLL TLS_12_PRF final : public KDF
                  const byte label[], size_t label_len) const override;
 
       explicit TLS_12_PRF(MessageAuthenticationCode* mac) : m_mac(mac) {}
-
-      static TLS_12_PRF* make(const Spec& spec);
    private:
       std::unique_ptr<MessageAuthenticationCode> m_mac;
    };

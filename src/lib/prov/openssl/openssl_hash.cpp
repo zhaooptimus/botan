@@ -7,7 +7,6 @@
 
 #include <botan/hash.h>
 #include <botan/internal/openssl.h>
-#include <botan/internal/algo_registry.h>
 #include <openssl/evp.h>
 
 namespace Botan {
@@ -70,45 +69,46 @@ class OpenSSL_HashFunction : public HashFunction
       EVP_MD_CTX m_md;
    };
 
-std::function<HashFunction* (const HashFunction::Spec&)>
-make_evp_hash_maker(const EVP_MD* md, const char* algo)
-   {
-   return [md,algo](const HashFunction::Spec&)
-      {
-      return new OpenSSL_HashFunction(md, algo);
-      };
-   }
-
-#define BOTAN_REGISTER_OPENSSL_EVP_HASH(NAME, EVP)                      \
-   BOTAN_REGISTER_TYPE(HashFunction, OpenSSL_HashFunction ## EVP, NAME, \
-                       make_evp_hash_maker(EVP(), NAME), "openssl", BOTAN_OPENSSL_HASH_PRIO)
-
-#if !defined(OPENSSL_NO_SHA)
-   BOTAN_REGISTER_OPENSSL_EVP_HASH("SHA-160", EVP_sha1);
-#endif
-
-#if !defined(OPENSSL_NO_SHA256)
-   BOTAN_REGISTER_OPENSSL_EVP_HASH("SHA-224", EVP_sha224);
-   BOTAN_REGISTER_OPENSSL_EVP_HASH("SHA-256", EVP_sha256);
-#endif
-
-#if !defined(OPENSSL_NO_SHA512)
-   BOTAN_REGISTER_OPENSSL_EVP_HASH("SHA-384", EVP_sha384);
-   BOTAN_REGISTER_OPENSSL_EVP_HASH("SHA-512", EVP_sha512);
-#endif
-
-#if !defined(OPENSSL_NO_MD4)
-   BOTAN_REGISTER_OPENSSL_EVP_HASH("MD4", EVP_md4);
-#endif
-
-#if !defined(OPENSSL_NO_MD5)
-   BOTAN_REGISTER_OPENSSL_EVP_HASH("MD5", EVP_md5);
-#endif
-
-#if !defined(OPENSSL_NO_RIPEMD)
-   BOTAN_REGISTER_OPENSSL_EVP_HASH("RIPEMD-160", EVP_ripemd160);
-#endif
-
 }
+
+std::unique_ptr<HashFunction>
+make_openssl_hash(const std::string& name)
+   {
+   static const std::map<std::string, const EVP_MD*> s_hash_evps = {
+#if defined(BOTAN_HAS_SHA1) && !defined(OPENSSL_NO_SHA)
+      { "SHA-160", EVP_sha1() },
+#endif
+
+#if defined(BOTAN_HAS_SHA2_32) && !defined(OPENSSL_NO_SHA256)
+      { "SHA-224", EVP_sha224() },
+      { "SHA-256", EVP_sha256() },
+#endif
+
+#if defined(BOTAN_HAS_SHA2_64) && !defined(OPENSSL_NO_SHA512)
+      { "SHA-384", EVP_sha384() },
+      { "SHA-512", EVP_sha512() },
+#endif
+
+#if defined(BOTAN_HAS_MD4) && !defined(OPENSSL_NO_MD4)
+      { "MD4", EVP_md4() },
+#endif
+
+#if defined(BOTAN_HAS_MD5) && !defined(OPENSSL_NO_MD5)
+      { "MD5", EVP_md5() },
+#endif
+
+#if defined(BOTAN_HAS_RIPEMD_160) && !defined(OPENSSL_NO_RIPEMD)
+      { "RIPEMD-160", EVP_ripemd160() },
+#endif
+   };
+
+   auto i = s_hash_evps.find(name);
+   if(i != s_hash_evps.end())
+      {
+      return std::unique_ptr<HashFunction>(new OpenSSL_HashFunction(i->second, i->first));
+      }
+
+   throw Lookup_Error("No OpenSSL support for hash " + name);
+   }
 
 }

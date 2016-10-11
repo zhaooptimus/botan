@@ -46,8 +46,6 @@ class BOTAN_DLL SP800_56C : public KDF
                  const byte label[], size_t label_len) const override;
 
       SP800_56C(MessageAuthenticationCode* mac, KDF* exp) : m_prf(mac), m_exp(exp) {}
-
-      static SP800_56C* make(const Spec& spec);
    private:
       std::unique_ptr<MessageAuthenticationCode> m_prf;
       std::unique_ptr<KDF> m_exp;

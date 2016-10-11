@@ -22,8 +22,6 @@ class BOTAN_DLL MessageAuthenticationCode : public Buffered_Computation,
                                             public SymmetricAlgorithm
    {
    public:
-      typedef SCAN_Name Spec;
-
       /**
       * Create an instance based on a name
       * Will return a null pointer if the algo/provider combination cannot
@@ -32,12 +30,9 @@ class BOTAN_DLL MessageAuthenticationCode : public Buffered_Computation,
       static std::unique_ptr<MessageAuthenticationCode> create(const std::string& algo_spec,
                                                                const std::string& provider = "");
 
-      /**
-      * Returns the list of available providers for this algorithm, empty if not available
-      */
       static std::vector<std::string> providers(const std::string& algo_spec);
 
-      virtual ~MessageAuthenticationCode();
+      virtual ~MessageAuthenticationCode() {}
 
       /**
       * Verify a MAC.

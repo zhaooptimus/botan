@@ -37,8 +37,6 @@ class BOTAN_DLL PBKDF
       */
       static std::vector<std::string> providers(const std::string& algo_spec);
 
-      typedef SCAN_Name Spec;
-
       /**
       * @return new instance of this same algorithm
       */
