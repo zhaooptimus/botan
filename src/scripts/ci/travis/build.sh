@@ -114,8 +114,7 @@ fi
 ccache --show-stats
 
 # build!
-echo $MAKE_PREFIX make -j $BUILD_JOBS
-time $MAKE_PREFIX make -j $BUILD_JOBS
+time $MAKE_PREFIX make -k -j $BUILD_JOBS
 
 # post-build ccache stats
 ccache --show-stats
