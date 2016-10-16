@@ -319,6 +319,18 @@ std::unique_ptr<HashFunction> HashFunction::create(const std::string& algo_spec,
    return nullptr;
    }
 
+//static
+std::unique_ptr<HashFunction>
+HashFunction::create_or_throw(const std::string& algo,
+                              const std::string& provider)
+   {
+   if(auto hash = HashFunction::create(algo, provider))
+      {
+      return hash;
+      }
+   throw Lookup_Error("Hash", algo, provider);
+   }
+
 std::vector<std::string> HashFunction::providers(const std::string& algo_spec)
    {
    return probe_providers_of<HashFunction>(algo_spec, {"base", "openssl"});

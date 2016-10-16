@@ -6,7 +6,6 @@
 */
 
 #include <botan/block_cipher.h>
-#include <botan/internal/algo_registry.h>
 #include <botan/internal/openssl.h>
 #include <openssl/evp.h>
 
@@ -154,11 +153,6 @@ void OpenSSL_BlockCipher::clear()
 std::unique_ptr<BlockCipher>
 make_openssl_block_cipher(const std::string& name)
    {
-   throw Lookup_Error("OpenSSL does not support cipher " + name);
-   }
-
-}
-
 /*
 #if !defined(OPENSSL_NO_AES)
    BOTAN_REGISTER_OPENSSL_EVP_BLOCK("AES-128", EVP_aes_128_ecb);
@@ -193,4 +187,9 @@ make_openssl_block_cipher(const std::string& name)
    BOTAN_REGISTER_OPENSSL_EVP_BLOCK("SEED", EVP_seed_ecb);
 #endif
 */
+
+   throw Lookup_Error("OpenSSL does not support cipher " + name);
+   }
+
+}
 

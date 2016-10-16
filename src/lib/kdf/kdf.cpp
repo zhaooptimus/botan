@@ -185,6 +185,18 @@ std::unique_ptr<KDF> KDF::create(const std::string& algo_spec,
    return nullptr;
    }
 
+//static
+std::unique_ptr<KDF>
+KDF::create_or_throw(const std::string& algo,
+                             const std::string& provider)
+   {
+   if(auto bc = KDF::create(algo, provider))
+      {
+      return bc;
+      }
+   throw Lookup_Error("Block cipher", algo, provider);
+   }
+
 std::vector<std::string> KDF::providers(const std::string& algo_spec)
    {
    return probe_providers_of<KDF>(algo_spec, { "base" });

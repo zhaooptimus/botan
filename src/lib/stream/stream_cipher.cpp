@@ -99,6 +99,18 @@ std::unique_ptr<StreamCipher> StreamCipher::create(const std::string& algo_spec,
    return nullptr;
    }
 
+//static
+std::unique_ptr<StreamCipher>
+StreamCipher::create_or_throw(const std::string& algo,
+                             const std::string& provider)
+   {
+   if(auto sc = StreamCipher::create(algo, provider))
+      {
+      return sc;
+      }
+   throw Lookup_Error("Stream cipher", algo, provider);
+   }
+
 std::vector<std::string> StreamCipher::providers(const std::string& algo_spec)
    {
    return probe_providers_of<StreamCipher>(algo_spec, {"base", "openssl"});

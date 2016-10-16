@@ -5,8 +5,8 @@
 * Botan is released under the Simplified BSD License (see license.txt)
 */
 
-#ifndef BOTAN_OPENSSL_H__
-#define BOTAN_OPENSSL_H__
+#ifndef BOTAN_INTERNAL_OPENSSL_H__
+#define BOTAN_INTERNAL_OPENSSL_H__
 
 #include <botan/internal/pk_ops.h>
 #include <botan/secmem.h>

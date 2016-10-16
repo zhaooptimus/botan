@@ -21,23 +21,22 @@ class BOTAN_DLL HashFunction : public Buffered_Computation
    {
    public:
       /**
-      * Create an instance based on a name
-      * Will return a null pointer if the algo/provider combination cannot
-      * be found. If provider is empty then best available is chosen.
+      * Create an instance based on a name, or return null if the
+      * algo/provider combination cannot be found. If provider is
+      * empty then best available is chosen.
       */
       static std::unique_ptr<HashFunction>
          create(const std::string& algo_spec,
                 const std::string& provider = "");
 
+      /**
+      * Create an instance based on a name, or throw if the
+      * algo/provider combination cannot be found. If provider is
+      * empty then best available is chosen.
+      */
       static std::unique_ptr<HashFunction>
          create_or_throw(const std::string& algo_spec,
-                         const std::string& provider = "")
-         {
-         std::unique_ptr<HashFunction> h = HashFunction::create(algo_spec, provider);
-         if(h)
-            return h;
-         throw Lookup_Error(algo_spec);
-         }
+                         const std::string& provider = "");
 
       /**
       * Returns the list of available providers for this algorithm, empty if not available

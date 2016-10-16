@@ -114,6 +114,18 @@ MessageAuthenticationCode::providers(const std::string& algo_spec)
    return probe_providers_of<MessageAuthenticationCode>(algo_spec, {"base", "openssl"});
    }
 
+//static
+std::unique_ptr<MessageAuthenticationCode>
+MessageAuthenticationCode::create_or_throw(const std::string& algo,
+                                           const std::string& provider)
+   {
+   if(auto mac = MessageAuthenticationCode::create(algo, provider))
+      {
+      return mac;
+      }
+   throw Lookup_Error("MAC", algo, provider);
+   }
+
 /*
 * Default (deterministic) MAC verification operation
 */
