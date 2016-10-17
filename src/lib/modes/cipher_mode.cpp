@@ -25,101 +25,7 @@
   #include <botan/xts.h>
 #endif
 
-#if defined(BOTAN_HAS_AEAD_CCM)
-  #include <botan/ccm.h>
-#endif
-
-#if defined(BOTAN_HAS_AEAD_CHACHA20_POLY1305)
-  #include <botan/chacha20poly1305.h>
-#endif
-
-#if defined(BOTAN_HAS_AEAD_EAX)
-  #include <botan/eax.h>
-#endif
-
-#if defined(BOTAN_HAS_AEAD_GCM)
-  #include <botan/gcm.h>
-#endif
-
-#if defined(BOTAN_HAS_AEAD_OCB)
-  #include <botan/ocb.h>
-#endif
-
-#if defined(BOTAN_HAS_AEAD_SIV)
-  #include <botan/siv.h>
-#endif
-
 namespace Botan {
-
-/*
-
-#if defined(BOTAN_HAS_AEAD_CCM)
-BOTAN_REGISTER_BLOCK_CIPHER_MODE_LEN2(CCM_Encryption, CCM_Decryption, 16, 3);
-#endif
-
-#if defined(BOTAN_HAS_AEAD_CHACHA20_POLY1305)
-BOTAN_REGISTER_T_NOARGS(Cipher_Mode, ChaCha20Poly1305_Encryption);
-BOTAN_REGISTER_T_NOARGS(Cipher_Mode, ChaCha20Poly1305_Decryption);
-#endif
-
-#if defined(BOTAN_HAS_AEAD_EAX)
-BOTAN_REGISTER_BLOCK_CIPHER_MODE_LEN(EAX_Encryption, EAX_Decryption, 0);
-#endif
-
-#if defined(BOTAN_HAS_AEAD_GCM)
-BOTAN_REGISTER_BLOCK_CIPHER_MODE_LEN(GCM_Encryption, GCM_Decryption, 16);
-#endif
-
-#if defined(BOTAN_HAS_AEAD_OCB)
-BOTAN_REGISTER_BLOCK_CIPHER_MODE_LEN(OCB_Encryption, OCB_Decryption, 16);
-#endif
-
-#if defined(BOTAN_HAS_AEAD_SIV)
-BOTAN_REGISTER_BLOCK_CIPHER_MODE(SIV_Encryption, SIV_Decryption);
-#endif
-
-#define BOTAN_REGISTER_CIPHER_MODE(name, maker) BOTAN_REGISTER_T(Cipher_Mode, name, maker)
-#define BOTAN_REGISTER_CIPHER_MODE_NOARGS(name) BOTAN_REGISTER_T_NOARGS(Cipher_Mode, name)
-
-#if defined(BOTAN_HAS_MODE_ECB)
-
-template<typename T>
-Cipher_Mode* make_ecb_mode(const Cipher_Mode::Spec& spec)
-   {
-   std::unique_ptr<BlockCipher> bc(BlockCipher::create(spec.arg(0)));
-   std::unique_ptr<BlockCipherModePaddingMethod> pad(get_bc_pad(spec.arg(1, "NoPadding")));
-   if(bc && pad)
-      return new T(bc.release(), pad.release());
-   return nullptr;
-   }
-
-BOTAN_REGISTER_CIPHER_MODE(ECB_Encryption, make_ecb_mode<ECB_Encryption>);
-BOTAN_REGISTER_CIPHER_MODE(ECB_Decryption, make_ecb_mode<ECB_Decryption>);
-#endif
-
-#if defined(BOTAN_HAS_MODE_CBC)
-
-template<typename CBC_T, typename CTS_T>
-Cipher_Mode* make_cbc_mode(const Cipher_Mode::Spec& spec)
-   {
-   std::unique_ptr<BlockCipher> bc(BlockCipher::create(spec.arg(0)));
-
-   if(bc)
-      {
-      const std::string padding = spec.arg(1, "PKCS7");
-
-      if(padding == "CTS")
-         return new CTS_T(bc.release());
-      else
-         return new CBC_T(bc.release(), get_bc_pad(padding));
-      }
-
-   return nullptr;
-   }
-
-BOTAN_REGISTER_CIPHER_MODE(CBC_Encryption, (make_cbc_mode<CBC_Encryption,CTS_Encryption>));
-BOTAN_REGISTER_CIPHER_MODE(CBC_Decryption, (make_cbc_mode<CBC_Decryption,CTS_Decryption>));
-#endif
 
 #if defined(BOTAN_HAS_MODE_CFB)
 BOTAN_REGISTER_BLOCK_CIPHER_MODE_LEN(CFB_Encryption, CFB_Decryption, 0);
@@ -128,23 +34,75 @@ BOTAN_REGISTER_BLOCK_CIPHER_MODE_LEN(CFB_Encryption, CFB_Decryption, 0);
 #if defined(BOTAN_HAS_MODE_XTS)
 BOTAN_REGISTER_BLOCK_CIPHER_MODE(XTS_Encryption, XTS_Decryption);
 #endif
-*/
-
 
 Cipher_Mode* get_cipher_mode(const std::string& algo_spec, Cipher_Dir direction)
    {
-   const std::string provider = "";
-
+   /*
+   if(Cipher_Mode* aead = get_aead(algo_spec, direction))
+   {
+      return aead;
+   }
+   */
    const char* dir_string = (direction == ENCRYPTION) ? "_Encryption" : "_Decryption";
 
    SCAN_Name spec(algo_spec, dir_string);
 
-   std::unique_ptr<Cipher_Mode> cipher_mode(get_cipher(algo_spec, dir_string));
-
-   if(auto cipher = get_cipher(algo_spec, idr
+#if defined(BOTAN_HAS_CBC)
+   if(spec.algo_name() == "CBC_Encryption")
       {
-      return cipher_mode.release();
+      std::unique_ptr<BlockCipher> bc(BlockCipher::create(spec.arg(0)));
+
+      if(bc)
+         {
+         const std::string padding = spec.arg(1, "PKCS7");
+
+         if(padding == "CTS")
+            return new CTS_Encryption(bc.release());
+         else
+            return new CBC_Encryption(bc.release(), get_bc_pad(padding));
+         }
       }
+
+   if(spec.algo_name() == "CBC_Decryption")
+      {
+      std::unique_ptr<BlockCipher> bc(BlockCipher::create(spec.arg(0)));
+
+      if(bc)
+         {
+         const std::string padding = spec.arg(1, "PKCS7");
+
+         if(padding == "CTS")
+            return new CTS_Encryption(bc.release());
+         else
+            return new CBC_Encryption(bc.release(), get_bc_pad(padding));
+         }
+      }
+#endif
+
+#if defined(BOTAN_HAS_XTS)
+
+#endif
+
+#if defined(BOTAN_HAS_CFB)
+
+#endif
+
+#if defined(BOTAN_HAS_ECB)
+   if(spec.algo_name() == "ECB_Encryption")
+      {
+      std::unique_ptr<BlockCipher> bc(BlockCipher::create(spec.arg(0)));
+      std::unique_ptr<BlockCipherModePaddingMethod> pad(get_bc_pad(spec.arg(1, "NoPadding")));
+      if(bc && pad)
+         return new ECB_Encryption(bc.release(), pad.release());
+      }
+   if(spec.algo_name() == "ECB_Decryption")
+      {
+      std::unique_ptr<BlockCipher> bc(BlockCipher::create(spec.arg(0)));
+      std::unique_ptr<BlockCipherModePaddingMethod> pad(get_bc_pad(spec.arg(1, "NoPadding")));
+      if(bc && pad)
+         return new ECB_Decryption(bc.release(), pad.release());
+      }
+#endif
 
    const std::vector<std::string> algo_parts = split_on(algo_spec, '/');
    if(algo_parts.size() < 2)

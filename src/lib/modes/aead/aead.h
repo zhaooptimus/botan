@@ -59,22 +59,6 @@ class BOTAN_DLL AEAD_Mode : public Cipher_Mode
       virtual ~AEAD_Mode() {}
    };
 
-/**
-* Get an AEAD mode by name (eg "AES-128/GCM" or "Serpent/EAX")
-*/
-inline AEAD_Mode* get_aead(const std::string& name, Cipher_Dir direction)
-   {
-   std::unique_ptr<Cipher_Mode> mode(get_cipher_mode(algo_spec, direction));
-
-   if(AEAD_Mode* aead = dynamic_cast<AEAD_Mode*>(mode.get()))
-      {
-      mode.release();
-      return aead;
-      }
-
-   return nullptr;
-   }
-
 }
 
 #endif
