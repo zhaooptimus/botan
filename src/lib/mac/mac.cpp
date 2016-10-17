@@ -6,6 +6,7 @@
 */
 
 #include <botan/mac.h>
+#include <botan/scan_name.h>
 #include <botan/mem_ops.h>
 
 #if defined(BOTAN_HAS_CBC_MAC)

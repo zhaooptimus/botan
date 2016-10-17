@@ -8,7 +8,6 @@
 #ifndef BOTAN_PUBKEY_EMSA_H__
 #define BOTAN_PUBKEY_EMSA_H__
 
-#include <botan/scan_name.h>
 #include <botan/secmem.h>
 #include <botan/rng.h>
 

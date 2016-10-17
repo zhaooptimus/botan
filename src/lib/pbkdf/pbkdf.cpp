@@ -6,6 +6,7 @@
 */
 
 #include <botan/pbkdf.h>
+#include <botan/scan_name.h>
 
 #if defined(BOTAN_HAS_PBKDF1)
 #include <botan/pbkdf1.h>

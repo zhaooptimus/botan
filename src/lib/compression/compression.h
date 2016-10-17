@@ -9,7 +9,6 @@
 #define BOTAN_COMPRESSION_TRANSFORM_H__
 
 #include <botan/secmem.h>
-#include <botan/scan_name.h>
 
 namespace Botan {
 
@@ -19,8 +18,6 @@ namespace Botan {
 class BOTAN_DLL Compression_Algorithm
    {
    public:
-      typedef SCAN_Name Spec;
-
       /**
       * Begin compressing. Most compression algorithms offer a tunable
       * time/compression tradeoff parameter generally represented by
@@ -67,8 +64,6 @@ class BOTAN_DLL Compression_Algorithm
 class BOTAN_DLL Decompression_Algorithm
    {
    public:
-      typedef SCAN_Name Spec;
-
       /**
       * Begin decompressing.
       * Decompression does not support levels, as compression does.

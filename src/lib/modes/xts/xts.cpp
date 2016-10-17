@@ -6,6 +6,7 @@
 */
 
 #include <botan/xts.h>
+#include <botan/loadstor.h>
 
 namespace Botan {
 

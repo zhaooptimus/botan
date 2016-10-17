@@ -7,6 +7,7 @@
 
 #include <botan/ocb.h>
 #include <botan/cmac.h>
+#include <botan/internal/bit_ops.h>
 
 namespace Botan {
 

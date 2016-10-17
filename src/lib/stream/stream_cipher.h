@@ -9,7 +9,7 @@
 #define BOTAN_STREAM_CIPHER_H__
 
 #include <botan/sym_algo.h>
-#include <botan/scan_name.h>
+#include <string>
 
 namespace Botan {
 

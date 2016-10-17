@@ -9,8 +9,6 @@
 #define BOTAN_PBKDF_H__
 
 #include <botan/symkey.h>
-#include <botan/scan_name.h>
-#include <botan/scan_name.h>
 #include <botan/exceptn.h>
 #include <chrono>
 

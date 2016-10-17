@@ -10,7 +10,6 @@
 
 #include <botan/buf_comp.h>
 #include <botan/sym_algo.h>
-#include <botan/scan_name.h>
 #include <string>
 
 namespace Botan {

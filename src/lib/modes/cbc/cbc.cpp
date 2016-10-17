@@ -7,6 +7,7 @@
 
 #include <botan/cbc.h>
 #include <botan/mode_pad.h>
+#include <botan/internal/rounding.h>
 
 namespace Botan {
 

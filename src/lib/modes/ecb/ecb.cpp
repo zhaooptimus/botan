@@ -6,6 +6,7 @@
 */
 
 #include <botan/ecb.h>
+#include <botan/internal/rounding.h>
 
 namespace Botan {
 

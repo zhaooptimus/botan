@@ -9,6 +9,7 @@
 
 #include <botan/zlib.h>
 #include <botan/internal/compress_utils.h>
+#include <botan/exceptn.h>
 #include <ctime>
 #include <zlib.h>
 

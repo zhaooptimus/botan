@@ -6,6 +6,7 @@
 */
 
 #include <botan/internal/compress_utils.h>
+#include <botan/exceptn.h>
 
 namespace Botan {
 

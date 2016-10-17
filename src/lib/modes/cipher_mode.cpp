@@ -7,7 +7,12 @@
 
 #include <botan/cipher_mode.h>
 #include <botan/stream_mode.h>
+#include <botan/scan_name.h>
 #include <sstream>
+
+#if defined(BOTAN_HAS_AEAD_MODES)
+  #include <botan/aead.h>
+#endif
 
 #if defined(BOTAN_HAS_MODE_ECB)
   #include <botan/ecb.h>
@@ -25,121 +30,117 @@
   #include <botan/xts.h>
 #endif
 
+#if defined(BOTAN_HAS_MODE_XTS)
+  #include <botan/xts.h>
+#endif
+
 namespace Botan {
 
-#if defined(BOTAN_HAS_MODE_CFB)
-BOTAN_REGISTER_BLOCK_CIPHER_MODE_LEN(CFB_Encryption, CFB_Decryption, 0);
-#endif
-
-#if defined(BOTAN_HAS_MODE_XTS)
-BOTAN_REGISTER_BLOCK_CIPHER_MODE(XTS_Encryption, XTS_Decryption);
-#endif
-
-Cipher_Mode* get_cipher_mode(const std::string& algo_spec, Cipher_Dir direction)
+Cipher_Mode* get_cipher_mode(const std::string& algo, Cipher_Dir direction)
    {
-   /*
-   if(Cipher_Mode* aead = get_aead(algo_spec, direction))
-   {
-      return aead;
-   }
-   */
-   const char* dir_string = (direction == ENCRYPTION) ? "_Encryption" : "_Decryption";
-
-   SCAN_Name spec(algo_spec, dir_string);
-
-#if defined(BOTAN_HAS_CBC)
-   if(spec.algo_name() == "CBC_Encryption")
-      {
-      std::unique_ptr<BlockCipher> bc(BlockCipher::create(spec.arg(0)));
-
-      if(bc)
-         {
-         const std::string padding = spec.arg(1, "PKCS7");
-
-         if(padding == "CTS")
-            return new CTS_Encryption(bc.release());
-         else
-            return new CBC_Encryption(bc.release(), get_bc_pad(padding));
-         }
-      }
-
-   if(spec.algo_name() == "CBC_Decryption")
-      {
-      std::unique_ptr<BlockCipher> bc(BlockCipher::create(spec.arg(0)));
-
-      if(bc)
-         {
-         const std::string padding = spec.arg(1, "PKCS7");
-
-         if(padding == "CTS")
-            return new CTS_Encryption(bc.release());
-         else
-            return new CBC_Encryption(bc.release(), get_bc_pad(padding));
-         }
-      }
-#endif
-
-#if defined(BOTAN_HAS_XTS)
-
-#endif
-
-#if defined(BOTAN_HAS_CFB)
-
-#endif
-
-#if defined(BOTAN_HAS_ECB)
-   if(spec.algo_name() == "ECB_Encryption")
-      {
-      std::unique_ptr<BlockCipher> bc(BlockCipher::create(spec.arg(0)));
-      std::unique_ptr<BlockCipherModePaddingMethod> pad(get_bc_pad(spec.arg(1, "NoPadding")));
-      if(bc && pad)
-         return new ECB_Encryption(bc.release(), pad.release());
-      }
-   if(spec.algo_name() == "ECB_Decryption")
-      {
-      std::unique_ptr<BlockCipher> bc(BlockCipher::create(spec.arg(0)));
-      std::unique_ptr<BlockCipherModePaddingMethod> pad(get_bc_pad(spec.arg(1, "NoPadding")));
-      if(bc && pad)
-         return new ECB_Decryption(bc.release(), pad.release());
-      }
-#endif
-
-   const std::vector<std::string> algo_parts = split_on(algo_spec, '/');
-   if(algo_parts.size() < 2)
-      return nullptr;
-
-   const std::string cipher_name = algo_parts[0];
-   const std::vector<std::string> mode_info = parse_algorithm_name(algo_parts[1]);
-
-   if(mode_info.empty())
-      return nullptr;
-
-   std::ostringstream alg_args;
-
-   alg_args << '(' << cipher_name;
-   for(size_t i = 1; i < mode_info.size(); ++i)
-      alg_args << ',' << mode_info[i];
-   for(size_t i = 2; i < algo_parts.size(); ++i)
-      alg_args << ',' << algo_parts[i];
-   alg_args << ')';
-
-   const std::string mode_name = mode_info[0] + alg_args.str();
-   const std::string mode_name_directional = mode_info[0] + dir_string + alg_args.str();
-
-   if(auto cipher = get_cipher(mode_name_directional, provider))
-      {
-      return cipher.release();
-      }
-
-   if(auto cipher = get_cipher(mode_name, provider))
-      {
-      return cipher.release();
-      }
-
-   if(auto sc = StreamCipher::create(mode_name, provider))
+   if(auto sc = StreamCipher::create(algo))
       {
       return new Stream_Cipher_Mode(sc.release());
       }
+
+#if defined(BOTAN_HAS_AEAD_MODES)
+   if(auto aead = get_aead(algo, direction))
+      {
+      return aead;
+      }
+#endif
+
+   if(algo.find('/') != std::string::npos)
+      {
+      const std::vector<std::string> algo_parts = split_on(algo, '/');
+      const std::string cipher_name = algo_parts[0];
+      const std::vector<std::string> mode_info = parse_algorithm_name(algo_parts[1]);
+
+      if(mode_info.empty())
+         return nullptr;
+
+      std::ostringstream alg_args;
+
+      alg_args << '(' << cipher_name;
+      for(size_t i = 1; i < mode_info.size(); ++i)
+         alg_args << ',' << mode_info[i];
+      for(size_t i = 2; i < algo_parts.size(); ++i)
+         alg_args << ',' << algo_parts[i];
+      alg_args << ')';
+
+      const std::string mode_name = mode_info[0] + alg_args.str();
+      return get_cipher_mode(mode_name, direction);
+      }
+
+   SCAN_Name spec(algo);
+   std::unique_ptr<BlockCipher> bc(BlockCipher::create(spec.arg(0)));
+
+   if(!bc)
+      {
+      return nullptr;
+      }
+
+#if defined(BOTAN_HAS_MODE_CBC)
+   if(spec.algo_name() == "CBC")
+      {
+      const std::string padding = spec.arg(1, "PKCS7");
+
+      if(padding == "CTS")
+         {
+         if(direction == ENCRYPTION)
+            return new CTS_Encryption(bc.release());
+         else
+            return new CTS_Decryption(bc.release());
+         }
+      else
+         {
+         std::unique_ptr<BlockCipherModePaddingMethod> pad(get_bc_pad(padding));
+
+         if(pad)
+            {
+            if(direction == ENCRYPTION)
+               return new CBC_Encryption(bc.release(), pad.release());
+            else
+               return new CBC_Decryption(bc.release(), pad.release());
+            }
+         }
+      }
+#endif
+
+#if defined(BOTAN_HAS_MODE_XTS)
+   if(spec.algo_name() == "XTS")
+      {
+      if(direction == ENCRYPTION)
+         return new XTS_Encryption(bc.release());
+      else
+         return new XTS_Decryption(bc.release());
+      }
+#endif
+
+#if defined(BOTAN_HAS_MODE_CFB)
+   if(spec.algo_name() == "CFB")
+      {
+      const size_t feedback_bits = spec.arg_as_integer(1, 8*bc->block_size());
+      if(direction == ENCRYPTION)
+         return new CFB_Encryption(bc.release(), feedback_bits);
+      else
+         return new CFB_Decryption(bc.release(), feedback_bits);
+      }
+#endif
+
+#if defined(BOTAN_HAS_MODE_ECB)
+   if(spec.algo_name() == "ECB")
+      {
+      std::unique_ptr<BlockCipherModePaddingMethod> pad(get_bc_pad(spec.arg(1, "NoPadding")));
+      if(pad)
+         {
+         if(direction == ENCRYPTION)
+            return new ECB_Encryption(bc.release(), pad.release());
+         else
+            return new ECB_Decryption(bc.release(), pad.release());
+         }
+      }
+#endif
 
    return nullptr;
    }

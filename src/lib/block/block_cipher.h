@@ -8,7 +8,6 @@
 #ifndef BOTAN_BLOCK_CIPHER_H__
 #define BOTAN_BLOCK_CIPHER_H__
 
-#include <botan/scan_name.h>
 #include <botan/sym_algo.h>
 #include <string>
 

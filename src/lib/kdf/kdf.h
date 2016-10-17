@@ -8,7 +8,6 @@
 #ifndef BOTAN_KDF_BASE_H__
 #define BOTAN_KDF_BASE_H__
 
-#include <botan/scan_name.h>
 #include <botan/secmem.h>
 #include <botan/types.h>
 #include <string>
