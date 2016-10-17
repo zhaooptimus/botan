@@ -108,7 +108,7 @@ BOTAN_DLL Compression_Algorithm* make_compressor(const std::string& type);
 BOTAN_DLL Decompression_Algorithm* make_decompressor(const std::string& type);
 
 /**
-* FIXME add doc
+* Adapts a zlib style API
 */
 class Compression_Stream
    {
@@ -131,7 +131,7 @@ class Compression_Stream
    };
 
 /**
-* FIXME add doc
+* Used to implement compression using Compression_Stream
 */
 class Stream_Compression : public Compression_Algorithm
    {

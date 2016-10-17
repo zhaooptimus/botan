@@ -7,8 +7,6 @@
 
 #include <botan/cipher_mode.h>
 #include <botan/stream_mode.h>
-#include <botan/internal/mode_utils.h>
-#include <botan/internal/algo_registry.h>
 #include <sstream>
 
 #if defined(BOTAN_HAS_MODE_ECB)
@@ -27,7 +25,58 @@
   #include <botan/xts.h>
 #endif
 
+#if defined(BOTAN_HAS_AEAD_CCM)
+  #include <botan/ccm.h>
+#endif
+
+#if defined(BOTAN_HAS_AEAD_CHACHA20_POLY1305)
+  #include <botan/chacha20poly1305.h>
+#endif
+
+#if defined(BOTAN_HAS_AEAD_EAX)
+  #include <botan/eax.h>
+#endif
+
+#if defined(BOTAN_HAS_AEAD_GCM)
+  #include <botan/gcm.h>
+#endif
+
+#if defined(BOTAN_HAS_AEAD_OCB)
+  #include <botan/ocb.h>
+#endif
+
+#if defined(BOTAN_HAS_AEAD_SIV)
+  #include <botan/siv.h>
+#endif
+
 namespace Botan {
+
+/*
+
+#if defined(BOTAN_HAS_AEAD_CCM)
+BOTAN_REGISTER_BLOCK_CIPHER_MODE_LEN2(CCM_Encryption, CCM_Decryption, 16, 3);
+#endif
+
+#if defined(BOTAN_HAS_AEAD_CHACHA20_POLY1305)
+BOTAN_REGISTER_T_NOARGS(Cipher_Mode, ChaCha20Poly1305_Encryption);
+BOTAN_REGISTER_T_NOARGS(Cipher_Mode, ChaCha20Poly1305_Decryption);
+#endif
+
+#if defined(BOTAN_HAS_AEAD_EAX)
+BOTAN_REGISTER_BLOCK_CIPHER_MODE_LEN(EAX_Encryption, EAX_Decryption, 0);
+#endif
+
+#if defined(BOTAN_HAS_AEAD_GCM)
+BOTAN_REGISTER_BLOCK_CIPHER_MODE_LEN(GCM_Encryption, GCM_Decryption, 16);
+#endif
+
+#if defined(BOTAN_HAS_AEAD_OCB)
+BOTAN_REGISTER_BLOCK_CIPHER_MODE_LEN(OCB_Encryption, OCB_Decryption, 16);
+#endif
+
+#if defined(BOTAN_HAS_AEAD_SIV)
+BOTAN_REGISTER_BLOCK_CIPHER_MODE(SIV_Encryption, SIV_Decryption);
+#endif
 
 #define BOTAN_REGISTER_CIPHER_MODE(name, maker) BOTAN_REGISTER_T(Cipher_Mode, name, maker)
 #define BOTAN_REGISTER_CIPHER_MODE_NOARGS(name) BOTAN_REGISTER_T_NOARGS(Cipher_Mode, name)
@@ -79,6 +128,8 @@ BOTAN_REGISTER_BLOCK_CIPHER_MODE_LEN(CFB_Encryption, CFB_Decryption, 0);
 #if defined(BOTAN_HAS_MODE_XTS)
 BOTAN_REGISTER_BLOCK_CIPHER_MODE(XTS_Encryption, XTS_Decryption);
 #endif
+*/
+
 
 Cipher_Mode* get_cipher_mode(const std::string& algo_spec, Cipher_Dir direction)
    {
@@ -86,15 +137,11 @@ Cipher_Mode* get_cipher_mode(const std::string& algo_spec, Cipher_Dir direction)
 
    const char* dir_string = (direction == ENCRYPTION) ? "_Encryption" : "_Decryption";
 
-   Cipher_Mode::Spec spec(algo_spec, dir_string);
+   SCAN_Name spec(algo_spec, dir_string);
 
-   std::unique_ptr<Cipher_Mode> cipher_mode(
-      Algo_Registry<Cipher_Mode>::global_registry().make(
-         Cipher_Mode::Spec(algo_spec, dir_string),
-         provider)
-      );
+   std::unique_ptr<Cipher_Mode> cipher_mode(get_cipher(algo_spec, dir_string));
 
-   if(cipher_mode)
+   if(auto cipher = get_cipher(algo_spec, idr
       {
       return cipher_mode.release();
       }
@@ -121,26 +168,14 @@ Cipher_Mode* get_cipher_mode(const std::string& algo_spec, Cipher_Dir direction)
    const std::string mode_name = mode_info[0] + alg_args.str();
    const std::string mode_name_directional = mode_info[0] + dir_string + alg_args.str();
 
-   cipher_mode.reset(
-      Algo_Registry<Cipher_Mode>::global_registry().make(
-         Cipher_Mode::Spec(mode_name_directional),
-         provider)
-      );
-
-   if(cipher_mode)
+   if(auto cipher = get_cipher(mode_name_directional, provider))
       {
-      return cipher_mode.release();
+      return cipher.release();
       }
 
-   cipher_mode.reset(
-      Algo_Registry<Cipher_Mode>::global_registry().make(
-         Cipher_Mode::Spec(mode_name),
-         provider)
-      );
-
-   if(cipher_mode)
+   if(auto cipher = get_cipher(mode_name, provider))
       {
-      return cipher_mode.release();
+      return cipher.release();
       }
 
    if(auto sc = StreamCipher::create(mode_name, provider))

@@ -6,7 +6,6 @@
 */
 
 #include <botan/gcm.h>
-#include <botan/internal/mode_utils.h>
 #include <botan/internal/ct_utils.h>
 #include <botan/ctr.h>
 

@@ -83,25 +83,26 @@
 
 namespace Botan {
 
-std::unique_ptr<BlockCipher> BlockCipher::create(const std::string& algo,
-                                                 const std::string& provider)
+std::unique_ptr<BlockCipher>
+BlockCipher::create(const std::string& algo,
+                    const std::string& provider)
    {
    const SCAN_Name req(algo);
 
 #if defined(BOTAN_HAS_OPENSSL)
    if(provider.empty() || provider == "openssl")
       {
-      try
-         {
-         return make_openssl_block_cipher(algo);
-         }
-      catch(Lookup_Error&)
-         {
-         if(provider.empty() == false)
-            throw;
-         }
+      if(auto bc = make_openssl_block_cipher(algo))
+         return bc;
+
+      if(!provider.empty())
+         return nullptr;
       }
 #endif
+
+   // TODO: CommonCrypto
+   // TODO: CryptoAPI
+   // TODO: /dev/crypto
 
    // Only base providers from here on out
    if(provider.empty() == false && provider != "base")
@@ -148,10 +149,7 @@ std::unique_ptr<BlockCipher> BlockCipher::create(const std::string& algo,
 #if defined(BOTAN_HAS_BLOWFISH)
    if(req.algo_name() == "Blowfish" && req.arg_count() == 0)
       {
-      if(provider.empty() || provider == "base")
-         {
-         return std::unique_ptr<BlockCipher>(new Blowfish);
-         }
+      return std::unique_ptr<BlockCipher>(new Blowfish);
       }
 #endif
 

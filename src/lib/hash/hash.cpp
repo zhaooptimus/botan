@@ -88,231 +88,171 @@ std::unique_ptr<HashFunction> HashFunction::create(const std::string& algo_spec,
    const SCAN_Name req(algo_spec);
 
 #if defined(BOTAN_HAS_OPENSSL)
-   if(provider == "openssl" || provider.empty())
+   if(provider.empty() || provider == "openssl")
       {
-      try
-         {
-         return make_openssl_hash(algo_spec);
-         }
-      catch(Lookup_Error& e)
-         {
-         // only throw if openssl version was requested, otherwise continue
-         if(provider == "openssl")
-            throw;
-         }
+      if(auto hash = make_openssl_hash(algo_spec))
+         return hash;
+
+      if(!provider.empty())
+         return nullptr;
       }
 #endif
+
+   if(provider.empty() == false && provider != "base")
+      return nullptr; // unknown provider
 
 #if defined(BOTAN_HAS_SHA1)
    if(req.algo_name() == "SHA-160")
       {
-      if(provider.empty() || provider == "base")
-         {
-         return std::unique_ptr<HashFunction>(new SHA_160);
-         }
+      return std::unique_ptr<HashFunction>(new SHA_160);
       }
 #endif
 
 #if defined(BOTAN_HAS_SHA2_32)
    if(req.algo_name() == "SHA-224")
       {
-      if(provider.empty() || provider == "base")
-         {
-         return std::unique_ptr<HashFunction>(new SHA_224);
-         }
+      return std::unique_ptr<HashFunction>(new SHA_224);
       }
 
    if(req.algo_name() == "SHA-256")
       {
-      if(provider.empty() || provider == "base")
-         {
-         return std::unique_ptr<HashFunction>(new SHA_256);
-         }
+      return std::unique_ptr<HashFunction>(new SHA_256);
       }
 #endif
 
 #if defined(BOTAN_HAS_SHA2_64)
    if(req.algo_name() == "SHA-384")
       {
-      if(provider.empty() || provider == "base")
-         {
-         return std::unique_ptr<HashFunction>(new SHA_384);
-         }
+      return std::unique_ptr<HashFunction>(new SHA_384);
       }
 
    if(req.algo_name() == "SHA-512")
       {
-      if(provider.empty() || provider == "base")
-         {
-         return std::unique_ptr<HashFunction>(new SHA_512);
-         }
+      return std::unique_ptr<HashFunction>(new SHA_512);
       }
 
    if(req.algo_name() == "SHA-512-256")
       {
-      if(provider.empty() || provider == "base")
-         {
-         return std::unique_ptr<HashFunction>(new SHA_512_256);
-         }
+      return std::unique_ptr<HashFunction>(new SHA_512_256);
       }
 #endif
 
 #if defined(BOTAN_HAS_RIPEMD_160)
    if(req.algo_name() == "RIPEMD-160")
       {
-      if(provider.empty() || provider == "base")
-         {
-         return std::unique_ptr<HashFunction>(new RIPEMD_160);
-         }
+      return std::unique_ptr<HashFunction>(new RIPEMD_160);
       }
 #endif
 
 #if defined(BOTAN_HAS_TIGER)
    if(req.algo_name() == "Tiger")
       {
-      if(provider.empty() || provider == "base")
-         {
-         return std::unique_ptr<HashFunction>(
-            new Tiger(req.arg_as_integer(0, 24),
-                      req.arg_as_integer(1, 3)));
-         }
+      return std::unique_ptr<HashFunction>(
+         new Tiger(req.arg_as_integer(0, 24),
+                   req.arg_as_integer(1, 3)));
       }
 #endif
 
 #if defined(BOTAN_HAS_SKEIN_512)
    if(req.algo_name() == "Skein-512")
       {
-      if(provider.empty() || provider == "base")
-         {
-         return std::unique_ptr<HashFunction>(
-            new Skein_512(req.arg_as_integer(0, 512), req.arg(1, "")));
-         }
+      return std::unique_ptr<HashFunction>(
+         new Skein_512(req.arg_as_integer(0, 512), req.arg(1, "")));
       }
 #endif
 
 #if defined(BOTAN_HAS_BLAKE2B)
    if(req.algo_name() == "Blake2b")
       {
-      if(provider.empty() || provider == "base")
-         {
-         return std::unique_ptr<HashFunction>(
-            new Blake2b(req.arg_as_integer(0, 512)));
-         }
+      return std::unique_ptr<HashFunction>(
+         new Blake2b(req.arg_as_integer(0, 512)));
    }
 #endif
 
 #if defined(BOTAN_HAS_KECCAK)
    if(req.algo_name() == "Keccak-1600")
       {
-      if(provider.empty() || provider == "base")
-         {
-         return std::unique_ptr<HashFunction>(
-            new Keccak_1600(req.arg_as_integer(0, 512)));
-         }
-   }
+      return std::unique_ptr<HashFunction>(
+         new Keccak_1600(req.arg_as_integer(0, 512)));
+      }
 #endif
 
 #if defined(BOTAN_HAS_WHIRLPOOL)
    if(req.algo_name() == "Whirlpool")
       {
-      if(provider.empty() || provider == "base")
-         {
-         return std::unique_ptr<HashFunction>(new Whirlpool);
-         }
+      return std::unique_ptr<HashFunction>(new Whirlpool);
       }
 #endif
 
 #if defined(BOTAN_HAS_PARALLEL_HASH)
    if(req.algo_name() == "Parallel")
       {
-      if(provider.empty() || provider == "base")
+      std::vector<std::unique_ptr<HashFunction>> hashes;
+
+      for(size_t i = 0; i != req.arg_count(); ++i)
          {
-         std::vector<std::unique_ptr<HashFunction>> hashes;
-
-         for(size_t i = 0; i != req.arg_count(); ++i)
+         auto h = HashFunction::create(req.arg(i));
+         if(!h)
             {
-            auto h = HashFunction::create(req.arg(i));
-            if(!h)
-               return nullptr;
-            hashes.push_back(std::move(h));
+            return nullptr;
             }
-
-         return std::unique_ptr<HashFunction>(new Parallel(hashes));
+         hashes.push_back(std::move(h));
          }
+
+      return std::unique_ptr<HashFunction>(new Parallel(hashes));
       }
 #endif
 
 #if defined(BOTAN_HAS_COMB4P)
    if(req.algo_name() == "Comb4p" && req.arg_count() == 2)
       {
-      if(provider.empty() || provider == "base")
-         {
-         std::unique_ptr<HashFunction> h1(HashFunction::create(req.arg(0)));
-         std::unique_ptr<HashFunction> h2(HashFunction::create(req.arg(1)));
+      std::unique_ptr<HashFunction> h1(HashFunction::create(req.arg(0)));
+      std::unique_ptr<HashFunction> h2(HashFunction::create(req.arg(1)));
 
-         if(h1 && h2)
-            return std::unique_ptr<HashFunction>(new Comb4P(h1.release(), h2.release()));
-         }
+      if(h1 && h2)
+         return std::unique_ptr<HashFunction>(new Comb4P(h1.release(), h2.release()));
       }
 #endif
 
 #if defined(BOTAN_HAS_MD5)
    if(req.algo_name() == "MD5")
       {
-      if(provider.empty() || provider == "base")
-         {
-         return std::unique_ptr<HashFunction>(new MD5);
-         }
+      return std::unique_ptr<HashFunction>(new MD5);
       }
 #endif
 
 #if defined(BOTAN_HAS_MD4)
    if(req.algo_name() == "MD4")
       {
-      if(provider.empty() || provider == "base")
-         {
-         return std::unique_ptr<HashFunction>(new MD4);
-         }
+      return std::unique_ptr<HashFunction>(new MD4);
       }
 #endif
 
 #if defined(BOTAN_HAS_GOST_34_11)
    if(req.algo_name() == "GOST-R-34.11-94")
       {
-      if(provider.empty() || provider == "base")
-         {
-         return std::unique_ptr<HashFunction>(new GOST_34_11);
-         }
+      return std::unique_ptr<HashFunction>(new GOST_34_11);
       }
 #endif
 
 #if defined(BOTAN_HAS_ADLER32)
    if(req.algo_name() == "Adler32")
       {
-      if(provider.empty() || provider == "base")
-         {
-         return std::unique_ptr<HashFunction>(new Adler32);
-         }
+      return std::unique_ptr<HashFunction>(new Adler32);
       }
 #endif
 
 #if defined(BOTAN_HAS_CRC24)
    if(req.algo_name() == "CRC24")
       {
-      if(provider.empty() || provider == "base")
-         {
-         return std::unique_ptr<HashFunction>(new CRC24);
-         }
+      return std::unique_ptr<HashFunction>(new CRC24);
       }
 #endif
 
 #if defined(BOTAN_HAS_CRC32)
    if(req.algo_name() == "CRC32")
       {
-      if(provider.empty() || provider == "base")
-         {
-         return std::unique_ptr<HashFunction>(new CRC32);
-         }
+      return std::unique_ptr<HashFunction>(new CRC32);
       }
 #endif
 

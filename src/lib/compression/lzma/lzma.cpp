@@ -14,8 +14,6 @@
 
 namespace Botan {
 
-BOTAN_REGISTER_COMPRESSION(LZMA_Compression, LZMA_Decompression);
-
 namespace {
 
 class LZMA_Stream : public Zlib_Style_Stream<lzma_stream, byte>

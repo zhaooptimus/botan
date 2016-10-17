@@ -134,14 +134,10 @@ std::vector<std::string> probe_providers_of(const std::string& algo_spec,
    std::vector<std::string> providers;
    for(auto&& prov : possible)
       {
-      try
+      std::unique_ptr<T> o(T::create(algo_spec, prov));
+      if(o)
          {
-         std::unique_ptr<T> s(T::create(algo_spec, prov));
          providers.push_back(prov); // available
-         }
-      catch(Lookup_Error&)
-         {
-         // not available
          }
       }
    return providers;

@@ -24,8 +24,6 @@ namespace Botan {
 class BOTAN_DLL Cipher_Mode
    {
    public:
-      typedef SCAN_Name Spec;
-
       virtual ~Cipher_Mode() {}
 
       /*
